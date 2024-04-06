@@ -3,6 +3,7 @@ module github.com/paraswaykole/layerdotrun
 go 1.20
 
 require (
+	github.com/boltdb/bolt v1.3.1
 	github.com/gofiber/fiber/v2 v2.52.2
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.20.4

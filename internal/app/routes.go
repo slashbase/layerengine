@@ -10,6 +10,7 @@ func (app App) setupRoutes(server *fiber.App) {
 
 	api := server.Group("/api/v1")
 	{
+		api.Get("/layer/:name", app.Layer.Controller.Get)
 		api.Post("/layer/update", app.Layer.Controller.Update)
 	}
 }

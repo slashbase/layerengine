@@ -4,10 +4,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/paraswaykole/layerdotrun/internal/global"
 	"github.com/paraswaykole/layerdotrun/internal/layer"
+	"github.com/paraswaykole/layerdotrun/internal/store"
 	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
 )
 
 type App struct {
+	Store  *store.Store
 	Global struct {
 		Controller *global.GlobalController
 	}
@@ -20,14 +22,19 @@ type App struct {
 }
 
 func NewApp() *App {
-	layerDao := layer.NewLayerDAO()
+	store := store.NewStore([]string{layer.BucketName})
 	layerEngine := layerengine.NewLayerEngine()
-	layerService := layer.NewLayerService(layerDao)
+
+	layerDao := layer.NewLayerDAO(store)
+	layerService := layer.NewLayerService(layerDao, layerEngine)
 	layerController := layer.NewLayerController(layerService)
 
 	globalController := global.NewGlobalController(layerService, layerEngine)
 
+	layerService.LoadAllLayers()
+
 	app := App{
+		Store: store,
 		Global: struct {
 			Controller *global.GlobalController
 		}{
@@ -56,4 +63,7 @@ func (app App) StartApp() {
 	// }))
 	app.setupRoutes(server)
 	server.Listen(":3000")
+}
+func (app App) CloseApp() {
+	app.Store.Close()
 }

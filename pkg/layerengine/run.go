@@ -6,6 +6,7 @@ type Layer struct {
 	Name      string
 	FnProto   *lua.FunctionProto
 	OutputLen int
+	Code      string
 }
 
 func runLayer(layer Layer, inputValues []interface{}) (interface{}, error) {

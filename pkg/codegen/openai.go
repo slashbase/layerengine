@@ -20,7 +20,7 @@ func sendChatCompletionRequest(chatCompletionRequest openai.ChatCompletionReques
 	return &resp, nil
 }
 
-func GenerateLuaFunctionCode(fnName, description string, inputs, outputs []string) (string, error) {
+func generateLuaFunctionCode(fnName, description string, inputs, outputs []string) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 

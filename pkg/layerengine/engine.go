@@ -20,12 +20,22 @@ func (le *LayerEngine) init() {
 	le.flows = map[string][]Layer{}
 }
 
+func (le *LayerEngine) LoadLayers(layers []Layer) {
+	for i := range layers {
+		layer := layers[i]
+		if fnProto, err := ParseAndCompileLuaCode(layer.Code); err == nil {
+			layer.FnProto = fnProto
+			le.layers[layer.Name] = layer
+		}
+	}
+}
+
 func (le *LayerEngine) Run(runtype RunType, name string, inputValues []interface{}) (interface{}, error) {
 	switch runtype {
 	case LAYER:
-		runLayer(le.layers[name], inputValues)
+		return runLayer(le.layers[name], inputValues)
 	case FLOW:
-		runFlow(le.flows[name], inputValues)
+		return runFlow(le.flows[name], inputValues)
 	}
 	return nil, errors.New("invald runtype")
 }

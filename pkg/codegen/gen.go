@@ -14,7 +14,7 @@ func GenerateLayerFunction(model int, fnName, description string, inputs, output
 	switch model {
 	case OPENAI_GPT3DOT5_TURBO:
 		var err error
-		codeStr, err = GenerateLuaFunctionCode(fnName, description, inputs, outputs)
+		codeStr, err = generateLuaFunctionCode(fnName, description, inputs, outputs)
 		if err != nil {
 			return "", err
 		}
