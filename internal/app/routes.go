@@ -10,8 +10,16 @@ func (app App) setupRoutes(server *fiber.App) {
 
 	api := server.Group("/api/v1")
 	{
-		api.Get("/layer/:name", app.Layer.Controller.Get)
-		api.Post("/layer/update", app.Layer.Controller.Update)
+		layerGroup := api.Group("layer")
+		{
+			layerGroup.Get("/:name", app.Layer.Controller.Get)
+			layerGroup.Post("/update", app.Layer.Controller.Update)
+		}
+		flowGroup := api.Group("flow")
+		{
+			flowGroup.Get("/:name", app.Flow.Controller.Get)
+			flowGroup.Post("/update", app.Flow.Controller.Update)
+		}
 	}
 }
 

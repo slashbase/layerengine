@@ -9,7 +9,7 @@ type Layer struct {
 	Code      string
 }
 
-func runLayer(layer Layer, inputValues []interface{}) (interface{}, error) {
+func runLayer(layer *Layer, inputValues []interface{}) (interface{}, error) {
 
 	layerRunner := NewLayerRunner()
 	defer layerRunner.Close()
@@ -35,7 +35,7 @@ func runLayer(layer Layer, inputValues []interface{}) (interface{}, error) {
 	return result, nil
 }
 
-func runFlow(layers []Layer, inputValues []interface{}) (interface{}, error) {
+func runFlow(layers []*Layer, inputValues []interface{}) (interface{}, error) {
 
 	var luaOutput []lua.LValue
 	for i, layer := range layers {
