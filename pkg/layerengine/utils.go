@@ -2,6 +2,7 @@ package layerengine
 
 import (
 	"fmt"
+	"strconv"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -58,14 +59,35 @@ func ConvertLuaValuesToGoValues(inputs []lua.LValue) []interface{} {
 	return outputs
 }
 
-func convertLuaTableToGo(tbl *lua.LTable) map[interface{}]interface{} {
-	goTable := make(map[interface{}]interface{})
+func convertLuaTableToGo(tbl *lua.LTable) interface{} {
+	goTable := make(map[string]interface{})
 
+	isArray := false
 	tbl.ForEach(func(key, value lua.LValue) {
-		goKey := key.String()                      // Convert Lua key to string for simplicity
-		goValue := ConvertLuaValueToGoValue(value) // Recursive call for nested values
+		if key.Type() == lua.LTNumber {
+			isArray = true
+			return
+		}
+		goKey := key.String()
+		goValue := ConvertLuaValueToGoValue(value)
 		goTable[goKey] = goValue
 	})
 
+	if isArray {
+		return convertLuaTableToGoArray(tbl)
+	}
+
 	return goTable
+}
+
+func convertLuaTableToGoArray(tbl *lua.LTable) interface{} {
+	arr := make([]interface{}, tbl.Len())
+
+	tbl.ForEach(func(key, value lua.LValue) {
+		goKey, _ := strconv.Atoi(key.String())
+		goValue := ConvertLuaValueToGoValue(value)
+		arr[goKey-1] = goValue
+	})
+
+	return arr
 }
