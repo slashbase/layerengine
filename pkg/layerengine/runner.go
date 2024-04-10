@@ -1,6 +1,7 @@
 package layerengine
 
 import (
+	"github.com/paraswaykole/layerdotrun/pkg/modules"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -16,6 +17,7 @@ func NewLayerRunner() *LayerRunner {
 
 func (cr *LayerRunner) init() {
 	cr.luaRunner = lua.NewState()
+	modules.Init(cr.luaRunner)
 }
 
 func (cr *LayerRunner) Close() {

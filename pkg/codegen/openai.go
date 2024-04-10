@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/paraswaykole/layerdotrun/internal/config"
+	"github.com/paraswaykole/layerdotrun/pkg/config"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -29,7 +29,11 @@ func generateLuaFunctionCode(fnName, description string, inputs, outputs []strin
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: "Write a Lua function that takes input parameters, processes the input according to given description and returns output.\nWrite code in json field \"code\".",
+				Content: modulesInfo,
+			},
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: promptGuide,
 			},
 			{
 				Role:    openai.ChatMessageRoleUser,
