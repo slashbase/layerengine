@@ -6,7 +6,7 @@ import (
 
 func Init(l *lua.LState) {
 	table := l.NewTable()
-	mods := AllModules()
+	mods := allModules()
 	for _, mod := range mods {
 		table.RawSetString(mod.Name(), mod.Init(l))
 	}

@@ -1,6 +1,7 @@
 package global
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
@@ -29,6 +30,7 @@ func (ctrl GlobalController) Run(c *fiber.Ctx) error {
 
 	result, err := ctrl.layerEngine.Run(body.Type, body.Name, body.InputValues)
 	if err != nil {
+		log.Printf("Run error: %v\n", err)
 		return c.SendStatus(http.StatusInternalServerError)
 	}
 
