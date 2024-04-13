@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/paraswaykole/layerdotrun/internal/api"
 	"github.com/paraswaykole/layerdotrun/internal/flow"
 	"github.com/paraswaykole/layerdotrun/internal/global"
 	"github.com/paraswaykole/layerdotrun/internal/layer"
@@ -24,11 +25,16 @@ type App struct {
 		Service    *flow.FlowService
 		Dao        *flow.FlowDAO
 	}
+	Api struct {
+		Controller *api.ApiController
+		Service    *api.ApiService
+		Dao        *api.ApiDAO
+	}
 	LayerEngine *layerengine.LayerEngine
 }
 
 func NewApp() *App {
-	store := store.NewStore([]string{layer.BucketName, flow.BucketName})
+	store := store.NewStore([]string{layer.BucketName, flow.BucketName, api.BucketName})
 	layerEngine := layerengine.NewLayerEngine()
 
 	layerDao := layer.NewLayerDAO(store)
@@ -38,6 +44,10 @@ func NewApp() *App {
 	flowDao := flow.NewFlowDAO(store)
 	flowService := flow.NewFlowService(flowDao, layerDao, layerEngine)
 	flowController := flow.NewFlowController(flowService)
+
+	apiDao := api.NewApiDAO(store)
+	apiService := api.NewApiService(apiDao)
+	apiController := api.NewApiController(apiService)
 
 	globalController := global.NewGlobalController(layerService, layerEngine)
 
@@ -68,6 +78,15 @@ func NewApp() *App {
 			Controller: flowController,
 			Service:    flowService,
 			Dao:        flowDao,
+		},
+		Api: struct {
+			Controller *api.ApiController
+			Service    *api.ApiService
+			Dao        *api.ApiDAO
+		}{
+			Controller: apiController,
+			Service:    apiService,
+			Dao:        apiDao,
 		},
 		LayerEngine: layerEngine,
 	}

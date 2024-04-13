@@ -20,6 +20,11 @@ func (app App) setupRoutes(server *fiber.App) {
 			flowGroup.Get("/:name", app.Flow.Controller.Get)
 			flowGroup.Post("/update", app.Flow.Controller.Update)
 		}
+		apiGroup := api.Group("api")
+		{
+			apiGroup.Get("/:name", app.Api.Controller.Get)
+			apiGroup.Post("/update", app.Api.Controller.Update)
+		}
 	}
 }
 
