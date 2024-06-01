@@ -10,12 +10,13 @@ import (
 )
 
 type GlobalController struct {
-	layerService *layer.LayerService
-	layerEngine  *layerengine.LayerEngine
+	globalService *GlobalService
+	layerService  *layer.LayerService
+	layerEngine   *layerengine.LayerEngine
 }
 
-func NewGlobalController(layerService *layer.LayerService, layerEngine *layerengine.LayerEngine) *GlobalController {
-	return &GlobalController{layerService: layerService, layerEngine: layerEngine}
+func NewGlobalController(globalService *GlobalService, layerService *layer.LayerService, layerEngine *layerengine.LayerEngine) *GlobalController {
+	return &GlobalController{globalService: globalService, layerService: layerService, layerEngine: layerEngine}
 }
 
 func (ctrl GlobalController) Run(c *fiber.Ctx) error {
@@ -38,4 +39,20 @@ func (ctrl GlobalController) Run(c *fiber.Ctx) error {
 		"success": true,
 		"result":  result,
 	})
+}
+
+func (ctrl GlobalController) RunApi(c *fiber.Ctx) error {
+	path := c.Path()
+	method := c.Method()
+
+	var body map[string]interface{}
+	c.BodyParser(&body)
+
+	result, err := ctrl.globalService.RunApi(path, method, body)
+	if err != nil {
+		log.Printf("RunApi error: %v\n", err)
+		return c.SendStatus(http.StatusInternalServerError)
+	}
+
+	return c.JSON(result)
 }

@@ -9,13 +9,28 @@ import (
 
 const BucketName = "apis"
 
+type HttpMethod string
+
+const (
+	MethodGet     HttpMethod = "GET"
+	MethodHead    HttpMethod = "HEAD"
+	MethodPost    HttpMethod = "POST"
+	MethodPut     HttpMethod = "PUT"
+	MethodPatch   HttpMethod = "PATCH"
+	MethodDelete  HttpMethod = "DELETE"
+	MethodConnect HttpMethod = "CONNECT"
+	MethodOptions HttpMethod = "OPTIONS"
+	MethodTrace   HttpMethod = "TRACE"
+)
+
 type Api struct {
-	Name      string         `json:"name"`
-	Path      string         `json:"path"`
-	Method    string         `json:"method"`
-	Flow      string         `json:"flow"`
-	InputMap  map[string]int `json:"inputMap"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Method    HttpMethod `json:"method"`
+	Flow      string     `json:"flow"`
+	InputMap  IOMap      `json:"inputMap"`
+	OutputMap IOMap      `json:"outputMap"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 }
 
 func toApi(data map[string]interface{}) Api {

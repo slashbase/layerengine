@@ -49,7 +49,8 @@ func NewApp() *App {
 	apiService := api.NewApiService(apiDao)
 	apiController := api.NewApiController(apiService)
 
-	globalController := global.NewGlobalController(layerService, layerEngine)
+	globalService := global.NewGlobalService(apiService, layerEngine)
+	globalController := global.NewGlobalController(globalService, layerService, layerEngine)
 
 	layerService.LoadAllLayers()
 	flowService.LoadAllFlows()

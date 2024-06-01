@@ -3,12 +3,13 @@ package api
 import "time"
 
 type ApiView struct {
-	Name      string         `json:"name"`
-	Path      string         `json:"path"`
-	Method    string         `json:"method"`
-	Flow      string         `json:"flow"`
-	InputMap  map[string]int `json:"inputMap"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Method    HttpMethod `json:"method"`
+	Flow      string     `json:"flow"`
+	InputMap  IOMap      `json:"inputMap"`
+	OutputMap IOMap      `json:"outputMap"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 }
 
 func ToApiView(api *Api) ApiView {
@@ -18,6 +19,7 @@ func ToApiView(api *Api) ApiView {
 		Method:    api.Method,
 		Flow:      api.Flow,
 		InputMap:  api.InputMap,
+		OutputMap: api.OutputMap,
 		UpdatedAt: api.UpdatedAt,
 	}
 }
