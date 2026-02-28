@@ -1,7 +1,7 @@
 package system
 
 import (
-	"github.com/paraswaykole/layerdotrun/pkg/config"
+	"github.com/slashbase/layerengine/pkg/config"
 	lua "github.com/yuin/gopher-lua"
 )
 

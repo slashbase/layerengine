@@ -2,7 +2,7 @@ package app
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/paraswaykole/layerdotrun/pkg/config"
+	"github.com/slashbase/layerengine/pkg/config"
 )
 
 func (app App) setupRoutes(server *fiber.App) {

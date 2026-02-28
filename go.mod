@@ -1,4 +1,4 @@
-module github.com/paraswaykole/layerdotrun
+module github.com/slashbase/layerengine
 
 go 1.20
 

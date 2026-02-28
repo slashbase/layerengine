@@ -1,8 +1,8 @@
 package global
 
 import (
-	"github.com/paraswaykole/layerdotrun/internal/api"
-	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
+	"github.com/slashbase/layerengine/internal/api"
+	"github.com/slashbase/layerengine/pkg/layerengine"
 )
 
 type GlobalService struct {

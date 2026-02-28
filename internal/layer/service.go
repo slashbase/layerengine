@@ -3,8 +3,8 @@ package layer
 import (
 	"time"
 
-	"github.com/paraswaykole/layerdotrun/pkg/codegen"
-	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
+	"github.com/slashbase/layerengine/pkg/codegen"
+	"github.com/slashbase/layerengine/pkg/layerengine"
 )
 
 type LayerService struct {

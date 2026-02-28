@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/paraswaykole/layerdotrun/internal/store"
+	"github.com/slashbase/layerengine/internal/store"
 )
 
 const BucketName = "layers"

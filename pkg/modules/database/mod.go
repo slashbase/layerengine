@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/paraswaykole/layerdotrun/pkg/database"
+	"github.com/slashbase/layerengine/pkg/database"
 	lua "github.com/yuin/gopher-lua"
 )
 

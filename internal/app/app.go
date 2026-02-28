@@ -2,12 +2,12 @@ package app
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/paraswaykole/layerdotrun/internal/api"
-	"github.com/paraswaykole/layerdotrun/internal/flow"
-	"github.com/paraswaykole/layerdotrun/internal/global"
-	"github.com/paraswaykole/layerdotrun/internal/layer"
-	"github.com/paraswaykole/layerdotrun/internal/store"
-	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
+	"github.com/slashbase/layerengine/internal/api"
+	"github.com/slashbase/layerengine/internal/flow"
+	"github.com/slashbase/layerengine/internal/global"
+	"github.com/slashbase/layerengine/internal/layer"
+	"github.com/slashbase/layerengine/internal/store"
+	"github.com/slashbase/layerengine/pkg/layerengine"
 )
 
 type App struct {

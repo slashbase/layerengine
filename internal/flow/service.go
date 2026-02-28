@@ -3,9 +3,9 @@ package flow
 import (
 	"time"
 
-	"github.com/paraswaykole/layerdotrun/internal/layer"
-	"github.com/paraswaykole/layerdotrun/pkg/codegen"
-	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
+	"github.com/slashbase/layerengine/internal/layer"
+	"github.com/slashbase/layerengine/pkg/codegen"
+	"github.com/slashbase/layerengine/pkg/layerengine"
 )
 
 type FlowService struct {

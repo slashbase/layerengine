@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/paraswaykole/layerdotrun/internal/layer"
-	"github.com/paraswaykole/layerdotrun/pkg/layerengine"
+	"github.com/slashbase/layerengine/internal/layer"
+	"github.com/slashbase/layerengine/pkg/layerengine"
 )
 
 type GlobalController struct {

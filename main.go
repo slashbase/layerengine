@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/paraswaykole/layerdotrun/internal/app"
-	"github.com/paraswaykole/layerdotrun/pkg/config"
-	"github.com/paraswaykole/layerdotrun/pkg/database"
+	"github.com/slashbase/layerengine/internal/app"
+	"github.com/slashbase/layerengine/pkg/config"
+	"github.com/slashbase/layerengine/pkg/database"
 )
 
 var version = "v0.0.0"

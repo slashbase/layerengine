@@ -1,7 +1,7 @@
 package layerengine
 
 import (
-	"github.com/paraswaykole/layerdotrun/pkg/modules"
+	"github.com/slashbase/layerengine/pkg/modules"
 	lua "github.com/yuin/gopher-lua"
 )
 
