@@ -1,9 +1,5 @@
 package layerengine
 
-import (
-	"errors"
-)
-
 type LayerEngine struct {
 	layers map[string]*Layer
 	flows  map[string][]*Layer
@@ -40,12 +36,10 @@ func (le *LayerEngine) LoadFlow(flows map[string][]string) {
 	}
 }
 
-func (le *LayerEngine) Run(runtype RunType, name string, inputValues []interface{}) (interface{}, error) {
-	switch runtype {
-	case LAYER:
-		return runLayer(le.layers[name], inputValues)
-	case FLOW:
-		return runFlow(le.flows[name], inputValues)
-	}
-	return nil, errors.New("invald runtype")
+func (le *LayerEngine) RunLayer(name string, inputValues []any) (interface{}, error) {
+	return runLayer(le.layers[name], inputValues)
+}
+
+func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (interface{}, error) {
+	return runFlow(le.flows[name], inputValues)
 }
