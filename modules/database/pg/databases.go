@@ -1,4 +1,4 @@
-package database
+package pg
 
 type databases struct {
 	dbs map[string]*Database

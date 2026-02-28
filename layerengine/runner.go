@@ -1,7 +1,7 @@
 package layerengine
 
 import (
-	"github.com/slashbase/layerengine/pkg/modules"
+	"github.com/slashbase/layerengine/modules"
 	lua "github.com/yuin/gopher-lua"
 )
 

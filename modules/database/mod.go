@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/slashbase/layerengine/pkg/database"
+	"github.com/slashbase/layerengine/modules/database/pg"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -42,7 +42,7 @@ func (Database) Query(l *lua.LState) int {
 			args = append(args, lua.LVAsBool(value))
 		}
 	}
-	data, err := database.Get().GetDB(dbName).Query(l, query, args...)
+	data, err := pg.Get().GetDB(dbName).Query(l, query, args...)
 	if err != nil {
 		return 0
 	}
@@ -74,7 +74,7 @@ func (Database) Exec(l *lua.LState) int {
 			args = append(args, lua.LVAsBool(value))
 		}
 	}
-	rowsAffected, resultStr, err := database.Get().GetDB(dbName).Exec(l, query, args...)
+	rowsAffected, resultStr, err := pg.Get().GetDB(dbName).Exec(l, query, args...)
 	if err != nil {
 		return 0
 	}

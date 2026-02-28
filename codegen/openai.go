@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/sashabaranov/go-openai"
-	"github.com/slashbase/layerengine/pkg/config"
+	"github.com/slashbase/layerengine/config"
 )
 
 func sendChatCompletionRequest(chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {

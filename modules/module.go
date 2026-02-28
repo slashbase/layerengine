@@ -1,8 +1,8 @@
 package modules
 
 import (
-	"github.com/slashbase/layerengine/pkg/modules/database"
-	"github.com/slashbase/layerengine/pkg/modules/system"
+	"github.com/slashbase/layerengine/modules/database"
+	"github.com/slashbase/layerengine/modules/system"
 	lua "github.com/yuin/gopher-lua"
 )
 
