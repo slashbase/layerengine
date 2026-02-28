@@ -1,10 +1,7 @@
 package config
 
 import (
-	"log"
 	"os"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -17,10 +14,6 @@ var conf *Config
 
 func Init(version string) {
 	if conf == nil {
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatal("Error loading .env file")
-		}
 		conf = &Config{
 			Version:   version,
 			IsLive:    false,
