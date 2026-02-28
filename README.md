@@ -1,3 +1,3 @@
-# layer.run
+# layerengine
 
-A simple AI generated backend system based on LLMs, Lua and Boltdb written in golang.
+Simple AI generated code running engine based on LLMs & Lua written in Golang

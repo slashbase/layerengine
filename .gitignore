@@ -4,6 +4,7 @@
 # Visual Studio Code
 /.vscode
 __debug_bin
+.devcontainer
 
 # Binaries for programs and plugins
 *.exe
