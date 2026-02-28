@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/sashabaranov/go-openai"
-	"github.com/slashbase/layerengine/config"
 )
 
-func sendChatCompletionRequest(chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	client := openai.NewClient(config.Get().OpenAIKey)
+func sendChatCompletionRequest(client *openai.Client, chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		chatCompletionRequest,
@@ -20,11 +18,11 @@ func sendChatCompletionRequest(chatCompletionRequest openai.ChatCompletionReques
 	return &resp, nil
 }
 
-func generateLuaFunctionCode(fnName, description string, inputs, outputs []string) (string, error) {
+func generateLuaFunctionCode(openAIClient *openai.Client, fnName, description string, inputs, outputs []string) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 
-	resp, err := sendChatCompletionRequest(openai.ChatCompletionRequest{
+	resp, err := sendChatCompletionRequest(openAIClient, openai.ChatCompletionRequest{
 		Model: openai.GPT3Dot5Turbo,
 		Messages: []openai.ChatCompletionMessage{
 			{

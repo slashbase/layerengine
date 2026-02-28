@@ -1,7 +1,6 @@
 package system
 
 import (
-	"github.com/slashbase/layerengine/config"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -18,6 +17,6 @@ func (System) Name() string {
 }
 
 func (System) printV(l *lua.LState) int {
-	l.Push(lua.LString(config.Get().Version))
+	l.Push(lua.LString("v0.0.0"))
 	return 1
 }
