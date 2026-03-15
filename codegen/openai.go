@@ -18,12 +18,12 @@ func sendChatCompletionRequest(client *openai.Client, chatCompletionRequest open
 	return &resp, nil
 }
 
-func generateLuaFunctionCode(openAIClient *openai.Client, fnName, description string, inputs, outputs []string) (string, error) {
+func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, description string, inputs, outputs []string) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 
 	resp, err := sendChatCompletionRequest(openAIClient, openai.ChatCompletionRequest{
-		Model: openai.GPT3Dot5Turbo,
+		Model: model,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
