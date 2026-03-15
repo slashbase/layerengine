@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"github.com/slashbase/layerengine/modules/database"
 	"github.com/slashbase/layerengine/modules/system"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -14,6 +13,5 @@ type Module interface {
 func allModules() []Module {
 	return []Module{
 		system.System{},
-		database.Database{},
 	}
 }
