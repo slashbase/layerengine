@@ -1,0 +1,25 @@
+name: template_test
+description: takes two numbers, adds them, multiplies the result by 100, and returns a formatted rupee amount string.
+input:
+  - number_a
+  - number_b
+layers:
+  - name: add_numbers
+    description: adds number_a and number_b together
+    input:
+      - number_a
+      - number_b
+    output:
+      - sum_result
+  - name: multiply_by_100
+    description: multiplies the sum by 100
+    input:
+      - sum_result
+    output:
+      - multiplied_result
+  - name: format_amount
+    description: formats the multiplied result into the string "Your final amount is ₹{number}"
+    input:
+      - multiplied_result
+    output:
+      - amount_string
