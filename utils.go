@@ -19,6 +19,8 @@ func ConvertGoValueToLuaValue(input interface{}) lua.LValue {
 		return lua.LNumber(val)
 	case string:
 		return lua.LString(val)
+	case lua.LNumber:
+		return lua.LNumber(val)
 	// Add more cases as needed for other types
 	default:
 		panic(fmt.Sprintf("Unsupported type: %T", val))
