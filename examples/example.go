@@ -17,7 +17,7 @@ func main() {
 	engine := layerengine.NewLayerEngine()
 	codegenerater, _ := codegen.NewCodeGen(OPENAI_API_KEY, ANTHROPIC_API_KEY, codegen.OPENAI_GPT3DOT5_TURBO)
 
-	data, err := os.ReadFile("../validator/template.yaml")
+	data, err := os.ReadFile("./template.yaml")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 		return

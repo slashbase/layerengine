@@ -494,7 +494,7 @@ layers:
 }
 
 func TestTemplateYAMLFile(t *testing.T) {
-	src, err := os.ReadFile("template.yaml")
+	src, err := os.ReadFile("../examples/template.yaml")
 	if err != nil {
 		t.Fatalf("could not read template.yaml: %v", err)
 	}
