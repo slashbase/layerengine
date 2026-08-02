@@ -44,10 +44,18 @@ func mustFail(t *testing.T, src string, wantSubstrings ...string) []error {
 
 const templateYAML = `
 name: template_test
-description: takes two numbers, adds them, multiplies the result by 100, and returns a formatted rupee amount string.
+description: takes two numbers, adds them, multiplies the result by 100 or given multiplier, and returns a formatted rupee amount string.
 input:
-  - number_a
-  - number_b
+  - number_a:
+      type: number
+      description: first number
+  - number_b:
+      type: number
+      description: second number
+  - multipier:
+      type: number
+      description: multipier number
+      optional: true
 layers:
   - name: add_numbers
     description: adds number_a and number_b together
@@ -56,10 +64,11 @@ layers:
       - number_b
     output:
       - sum_result
-  - name: multiply_by_100
-    description: multiplies the sum by 100
+  - name: multiply_numbers
+    description: multiplies the sum by multipier if given or 100.
     input:
       - sum_result
+      - multipier
     output:
       - multiplied_result
   - name: format_amount
@@ -80,8 +89,8 @@ func TestTemplateYAML_Compiles(t *testing.T) {
 	if flow.Name != "template_test" {
 		t.Errorf("Name = %q, want %q", flow.Name, "template_test")
 	}
-	if len(flow.Input) != 2 {
-		t.Errorf("len(Input) = %d, want 2", len(flow.Input))
+	if len(flow.Input) != 3 {
+		t.Errorf("len(Input) = %d, want 3", len(flow.Input))
 	}
 	if len(flow.Layers) != 3 {
 		t.Errorf("len(Layers) = %d, want 3", len(flow.Layers))
@@ -90,11 +99,35 @@ func TestTemplateYAML_Compiles(t *testing.T) {
 
 func TestTemplateYAML_LayerNames(t *testing.T) {
 	flow := mustCompile(t, templateYAML)
-	want := []string{"add_numbers", "multiply_by_100", "format_amount"}
+	want := []string{"add_numbers", "multiply_numbers", "format_amount"}
 	for i, l := range flow.Layers {
 		if l.Name != want[i] {
 			t.Errorf("Layers[%d].Name = %q, want %q", i, l.Name, want[i])
 		}
+	}
+}
+
+func TestTemplateYAML_FlowInputFields(t *testing.T) {
+	flow := mustCompile(t, templateYAML)
+
+	if flow.Input[0].Name != "number_a" {
+		t.Errorf("Input[0].Name = %q, want %q", flow.Input[0].Name, "number_a")
+	}
+	if flow.Input[0].Type != "number" {
+		t.Errorf("Input[0].Type = %q, want %q", flow.Input[0].Type, "number")
+	}
+	if flow.Input[0].Description != "first number" {
+		t.Errorf("Input[0].Description = %q, want %q", flow.Input[0].Description, "first number")
+	}
+	if flow.Input[0].Optional {
+		t.Error("Input[0].Optional = true, want false")
+	}
+
+	if flow.Input[2].Name != "multipier" {
+		t.Errorf("Input[2].Name = %q, want %q", flow.Input[2].Name, "multipier")
+	}
+	if !flow.Input[2].Optional {
+		t.Error("Input[2].Optional = false, want true")
 	}
 }
 
@@ -137,7 +170,9 @@ func TestNoLayers_Compiles(t *testing.T) {
 	src := `
 name: no_layers
 input:
-  - x
+  - x:
+      type: string
+      description: x input
 layers: []
 `
 	mustCompile(t, src)
@@ -176,6 +211,42 @@ layers:
 // ──────────────────────────────────────────────
 // § 4  Unknown-key enforcement
 // ──────────────────────────────────────────────
+
+func TestUnknownInputKey(t *testing.T) {
+	src := `
+name: flow
+input:
+  - x:
+      type: number
+      description: x value
+      bad_key: oops
+layers: []
+`
+	mustFail(t, src, "unknown key", "bad_key")
+}
+
+func TestBareScalarInputRejected(t *testing.T) {
+	src := `
+name: flow
+input:
+  - x
+layers: []
+`
+	mustFail(t, src, "must be a mapping (e.g. 'name: {type: ...}'), got scalar")
+}
+
+func TestMultiKeyInputMappingRejected(t *testing.T) {
+	src := `
+name: flow
+input:
+  - first:
+      type: string
+    second:
+      type: string
+layers: []
+`
+	mustFail(t, src, "input[0] mapping must have exactly one key")
+}
 
 func TestUnknownTopLevelKey(t *testing.T) {
 	src := `
@@ -223,7 +294,9 @@ func TestSameLayerInputOutputCollision(t *testing.T) {
 	src := `
 name: flow
 input:
-  - x
+  - x:
+      type: string
+      description: x input
 layers:
   - name: bad_layer
     input:
@@ -246,7 +319,9 @@ func TestLayerReproducesTopLevelInput(t *testing.T) {
 	src := `
 name: flow
 input:
-  - val
+  - val:
+      type: string
+      description: val input
 layers:
   - name: reproduce_layer
     input: []
@@ -268,7 +343,9 @@ func TestUnavailableInputInFirstLayer(t *testing.T) {
 	src := `
 name: flow
 input:
-  - a
+  - a:
+      type: string
+      description: a input
 layers:
   - name: needs_b
     input:
@@ -286,7 +363,9 @@ func TestUnavailableInputInSecondLayer(t *testing.T) {
 	src := `
 name: flow
 input:
-  - a
+  - a:
+      type: string
+      description: a input
 layers:
   - name: l1
     input:
@@ -310,8 +389,12 @@ func TestAvailablePoolHintInError(t *testing.T) {
 	src := `
 name: flow
 input:
-  - alpha
-  - beta
+  - alpha:
+      type: string
+      description: alpha input
+  - beta:
+      type: string
+      description: beta input
 layers:
   - name: l1
     input:
@@ -336,16 +419,21 @@ func TestCorrectPipelineOrder(t *testing.T) {
 	src := `
 name: chain
 input:
-  - start
+  - start:
+      type: string
+      description: start input
 layers:
   - name: step1
-    input: [start]
+    input:
+      - start
     output: [mid]
   - name: step2
-    input: [mid]
+    input:
+      - mid
     output: [end]
   - name: step3
-    input: [end]
+    input:
+      - end
     output: [final]
 `
 	mustCompile(t, src)
@@ -356,13 +444,17 @@ func TestOutOfOrderPipelineFails(t *testing.T) {
 	src := `
 name: out_of_order
 input:
-  - start
+  - start:
+      type: string
+      description: start input
 layers:
   - name: step2
-    input: [mid]
+    input:
+      - mid
     output: [end]
   - name: step1
-    input: [start]
+    input:
+      - start
     output: [mid]
 `
 	mustFail(t, src, `"mid"`, "not available")
@@ -453,7 +545,9 @@ func TestWhitespaceOnlyVariableNamesIgnored(t *testing.T) {
 	src := `
 name: flow
 input:
-  - "   "
+  - "   ":
+      type: string
+      description: blank
 layers:
   - name: l1
     input:
@@ -468,7 +562,9 @@ func TestLayerCanUseTopLevelInputDirectly(t *testing.T) {
 	src := `
 name: flow
 input:
-  - raw
+  - raw:
+      type: string
+      description: raw input
 layers:
   - name: consumer
     input:
@@ -507,8 +603,8 @@ func TestTemplateYAMLFile(t *testing.T) {
 	if flow.Name != "template_test" {
 		t.Errorf("Name = %q, want %q", flow.Name, "template_test")
 	}
-	if len(flow.Input) != 2 {
-		t.Errorf("len(Input) = %d, want 2", len(flow.Input))
+	if len(flow.Input) != 3 {
+		t.Errorf("len(Input) = %d, want 3", len(flow.Input))
 	}
 	if len(flow.Layers) != 3 {
 		t.Errorf("len(Layers) = %d, want 3", len(flow.Layers))
@@ -520,7 +616,7 @@ func TestTemplateYAMLFile(t *testing.T) {
 		output string
 	}{
 		{"add_numbers", []string{"number_a", "number_b"}, "sum_result"},
-		{"multiply_by_100", []string{"sum_result"}, "multiplied_result"},
+		{"multiply_numbers", []string{"sum_result", "multipier"}, "multiplied_result"},
 		{"format_amount", []string{"multiplied_result"}, "amount_string"},
 	}
 

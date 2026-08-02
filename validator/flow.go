@@ -19,11 +19,60 @@ type Layer struct {
 	Output      []string `yaml:"output"`
 }
 
+type FlowInput struct {
+	Name        string `yaml:"-"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
+	Optional    bool   `yaml:"optional"`
+}
+
+func (fi *FlowInput) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("line %d: input item must be a mapping (e.g. 'name: {type: ...}'), got %v", value.Line, value.Kind)
+	}
+	if len(value.Content) != 2 {
+		return fmt.Errorf("line %d: input item mapping must have exactly one key", value.Line)
+	}
+
+	// The first key is the input name
+	fi.Name = value.Content[0].Value
+
+	// The value is the nested mapping with type/description/optional
+	props := value.Content[1]
+	if props.Kind != yaml.MappingNode && !(props.Kind == yaml.ScalarNode && (props.Tag == "!!null" || props.Value == "")) {
+		return fmt.Errorf("line %d: input %q value must be a mapping with type/description/optional or null", value.Line, fi.Name)
+	}
+
+	// Unmarshal the properties into a temporary struct
+	type flowInputProps struct {
+		Type        string `yaml:"type"`
+		Description string `yaml:"description"`
+		Optional    bool   `yaml:"optional"`
+	}
+	var p flowInputProps
+	if err := props.Decode(&p); err != nil {
+		return fmt.Errorf("line %d: input %q: %w", value.Line, fi.Name, err)
+	}
+	fi.Type = p.Type
+	fi.Description = p.Description
+	fi.Optional = p.Optional
+	return nil
+}
+
 type Flow struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Input       []string `yaml:"input"`
-	Layers      []Layer  `yaml:"layers"`
+	Name        string      `yaml:"name"`
+	Description string      `yaml:"description"`
+	Input       []FlowInput `yaml:"input"`
+	Layers      []Layer     `yaml:"layers"`
+}
+
+// InputNames returns just the names from the flow's input definitions.
+func (f *Flow) InputNames() []string {
+	names := make([]string, len(f.Input))
+	for i, inp := range f.Input {
+		names[i] = inp.Name
+	}
+	return names
 }
 
 // ──────────────────────────────────────────────
@@ -36,6 +85,10 @@ var allowedTopKeys = map[string]bool{
 
 var allowedLayerKeys = map[string]bool{
 	"name": true, "description": true, "input": true, "output": true,
+}
+
+var allowedInputKeys = map[string]bool{
+	"type": true, "description": true, "optional": true,
 }
 
 // ──────────────────────────────────────────────
@@ -76,9 +129,35 @@ func Compile(src []byte) (*Flow, []error) {
 	// Validate top-level keys
 	errs = append(errs, validateKeys(doc, allowedTopKeys, "top-level")...)
 
-	// Find layers node and validate its children keys
+	// Find input and layers nodes and validate their children keys
 	for i := 0; i+1 < len(doc.Content); i += 2 {
-		if doc.Content[i].Value == "layers" {
+		switch doc.Content[i].Value {
+		case "input":
+			seq := doc.Content[i+1]
+			if seq.Kind != yaml.SequenceNode {
+				errs = append(errs, CompileError{seq.Line, "'input' must be a sequence"})
+				break
+			}
+			for idx, item := range seq.Content {
+				if item.Kind != yaml.MappingNode {
+					errs = append(errs, CompileError{item.Line, fmt.Sprintf(
+						"input[%d] must be a mapping (e.g. 'name: {type: ...}'), got scalar", idx)})
+					continue
+				}
+				if len(item.Content) != 2 {
+					errs = append(errs, CompileError{item.Line, fmt.Sprintf(
+						"input[%d] mapping must have exactly one key", idx)})
+					continue
+				}
+				// Each input item is a single-key mapping: name -> {type, description, optional}
+				// Validate the inner properties keys
+				inner := item.Content[1]
+				if inner.Kind == yaml.MappingNode {
+					errs = append(errs, validateKeys(inner, allowedInputKeys,
+						fmt.Sprintf("input[%d] %q", idx, item.Content[0].Value))...)
+				}
+			}
+		case "layers":
 			seq := doc.Content[i+1]
 			if seq.Kind != yaml.SequenceNode {
 				errs = append(errs, CompileError{seq.Line, "'layers' must be a sequence"})
@@ -126,7 +205,7 @@ func Compile(src []byte) (*Flow, []error) {
 	// internally.
 
 	topInputSet := make(map[string]bool)
-	for _, v := range flow.Input {
+	for _, v := range flow.InputNames() {
 		topInputSet[strings.TrimSpace(v)] = true
 	}
 
@@ -167,7 +246,7 @@ func Compile(src []byte) (*Flow, []error) {
 	//   2. The layer's outputs are then added to the pool for subsequent layers.
 
 	pool := make(map[string]string) // name -> "where it became available"
-	for _, v := range flow.Input {
+	for _, v := range flow.InputNames() {
 		v = strings.TrimSpace(v)
 		if v != "" {
 			pool[v] = "top-level input"
@@ -177,11 +256,11 @@ func Compile(src []byte) (*Flow, []error) {
 	for i, l := range flow.Layers {
 		layerID := fmt.Sprintf("layer[%d] %q", i+1, l.Name)
 		for _, v := range l.Input {
-			v = strings.TrimSpace(v)
-			if v == "" {
+			vName := strings.TrimSpace(v)
+			if vName == "" {
 				continue
 			}
-			if src, ok := pool[v]; ok {
+			if src, ok := pool[vName]; ok {
 				_ = src // available — fine
 			} else {
 				// Build a hint: what IS in the pool right now?
@@ -189,7 +268,7 @@ func Compile(src []byte) (*Flow, []error) {
 				errs = append(errs, fmt.Errorf(
 					"%s requires input %q but it is not available at this point\n"+
 						"        available pool: [%s]",
-					layerID, v, available,
+					layerID, vName, available,
 				))
 			}
 		}
@@ -205,6 +284,7 @@ func Compile(src []byte) (*Flow, []error) {
 	if len(errs) > 0 {
 		return nil, errs
 	}
+
 	return &flow, nil
 }
 

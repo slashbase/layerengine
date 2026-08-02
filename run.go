@@ -4,14 +4,6 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type Layer struct {
-	Name    string
-	FnProto *lua.FunctionProto
-	Input   []string
-	Output  []string
-	Code    string
-}
-
 func runLayer(layer *Layer, inputValues []interface{}) (interface{}, error) {
 
 	layerRunner := NewLayerRunner()
@@ -50,8 +42,8 @@ func runFlow(layers []*Layer, inputValues map[string]any) (interface{}, error) {
 		}
 
 		layerInputValues := make([]any, len(layer.Input))
-		for i, key := range layer.Input {
-			layerInputValues[i] = inputValues[key]
+		for i, inpName := range layer.Input {
+			layerInputValues[i] = inputValues[inpName]
 		}
 
 		luaInputs := ConvertGoValuesToLuaValues(layerInputValues)

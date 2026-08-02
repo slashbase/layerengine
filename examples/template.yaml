@@ -1,8 +1,16 @@
 name: template_test
-description: takes two numbers, adds them, multiplies the result by 100, and returns a formatted rupee amount string.
+description: takes two numbers, adds them, multiplies the result by 100 or given multiplier, and returns a formatted rupee amount string.
 input:
-  - number_a
-  - number_b
+  - number_a:
+      type: number
+      description: first number
+  - number_b:
+      type: number
+      description: second number
+  - multipier:
+      type: number
+      description: multipier number
+      optional: true
 layers:
   - name: add_numbers
     description: adds number_a and number_b together
@@ -11,10 +19,11 @@ layers:
       - number_b
     output:
       - sum_result
-  - name: multiply_by_100
-    description: multiplies the sum by 100
+  - name: multiply_numbers
+    description: multiplies the sum by multipier if given or 100.
     input:
       - sum_result
+      - multipier
     output:
       - multiplied_result
   - name: format_amount

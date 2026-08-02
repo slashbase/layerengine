@@ -49,6 +49,12 @@ type CodeGen struct {
 	model           int
 }
 
+// Input describes a named layer input for code generation.
+type Input struct {
+	Name     string
+	Optional bool
+}
+
 func NewCodeGen(openAISecretKey, anthropicSecretKey string, model int) (*CodeGen, error) {
 	_, isOpenAI := openAIModelStringMap[model]
 	_, isAnthropic := anthropicModelStringMap[model]
@@ -64,7 +70,7 @@ func NewCodeGen(openAISecretKey, anthropicSecretKey string, model int) (*CodeGen
 	}, nil
 }
 
-func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs, outputs []string) (string, error) {
+func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []Input, outputs []string) (string, error) {
 	if modelStr, ok := openAIModelStringMap[cg.model]; ok {
 		return generateLuaFunctionCode(cg.openAIClient, modelStr, fnName, description, inputs, outputs)
 	}

@@ -31,6 +31,7 @@ func main() {
 	inputValues := map[string]any{
 		"number_a": 3,
 		"number_b": 5,
+		// "multipier": 10, // optional — defaults to 100 if omitted
 	}
 	output, err := engine.RunFlow("template_test", inputValues)
 	if err != nil {
