@@ -13,7 +13,18 @@ func main() {
 	OPENAI_API_KEY := os.Getenv("OPENAI_API_KEY")
 	ANTHROPIC_API_KEY := os.Getenv("ANTHROPIC_API_KEY")
 
-	codegenerater, _ := codegen.NewCodeGen(OPENAI_API_KEY, ANTHROPIC_API_KEY, codegen.OPENAI_GPT3DOT5_TURBO)
+	var apiKey string
+	var modelId codegen.ModelID
+	if OPENAI_API_KEY != "" {
+		apiKey = OPENAI_API_KEY
+		modelId = codegen.GPT3Dot5Turbo
+	}
+	if ANTHROPIC_API_KEY != "" {
+		apiKey = ANTHROPIC_API_KEY
+		modelId = codegen.ClaudeSonnet4Dot5
+	}
+
+	codegenerater, _ := codegen.NewCodeGen(apiKey, modelId)
 	engine := layerengine.NewLayerEngine(codegenerater)
 
 	data, err := os.ReadFile("./template.yaml")
