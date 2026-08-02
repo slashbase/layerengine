@@ -12,27 +12,34 @@ import (
 // Schema types
 // ──────────────────────────────────────────────
 
-type Layer struct {
-	Name        string        `yaml:"name"`
-	Description string        `yaml:"description"`
-	Input       []string      `yaml:"input"`
-	Output      []LayerOutput `yaml:"output"`
+type layer struct {
+	Name        string        `yaml:"name"        key:"name"`
+	Description string        `yaml:"description" key:"description"`
+	Input       []string      `yaml:"input"       key:"input"`
+	Output      []layerOutput `yaml:"output"      key:"output"`
 }
 
-type FlowInput struct {
-	Name        string `yaml:"-"`
-	Type        string `yaml:"type"`
-	Description string `yaml:"description"`
-	Optional    bool   `yaml:"optional"`
+type flowInput struct {
+	Name        string `yaml:"-"            key:"name"`
+	Type        string `yaml:"type"         key:"type"`
+	Description string `yaml:"description"  key:"description"`
+	Optional    bool   `yaml:"optional"     key:"optional"`
 }
 
-type LayerOutput struct {
-	Name        string `yaml:"-"`
-	Type        string `yaml:"type"`
-	Description string `yaml:"description"`
+type layerOutput struct {
+	Name        string `yaml:"-"            key:"name"`
+	Type        string `yaml:"type"         key:"type"`
+	Description string `yaml:"description"  key:"description"`
 }
 
-func (fi *FlowInput) UnmarshalYAML(value *yaml.Node) error {
+type flow struct {
+	Name        string      `yaml:"name"        key:"name"`
+	Description string      `yaml:"description" key:"description"`
+	Input       []flowInput `yaml:"input"       key:"input"`
+	Layers      []layer     `yaml:"layers"      key:"layers"`
+}
+
+func (fi *flowInput) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("line %d: input item must be a mapping (e.g. 'name: {type: ...}'), got %v", value.Line, value.Kind)
 	}
@@ -65,7 +72,7 @@ func (fi *FlowInput) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-func (lo *LayerOutput) UnmarshalYAML(value *yaml.Node) error {
+func (lo *layerOutput) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("line %d: output item must be a mapping (e.g. 'name: {type: ...}'), got %v", value.Line, value.Kind)
 	}
@@ -96,15 +103,8 @@ func (lo *LayerOutput) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-type Flow struct {
-	Name        string      `yaml:"name"`
-	Description string      `yaml:"description"`
-	Input       []FlowInput `yaml:"input"`
-	Layers      []Layer     `yaml:"layers"`
-}
-
 // InputNames returns just the names from the flow's input definitions.
-func (f *Flow) InputNames() []string {
+func (f *flow) InputNames() []string {
 	names := make([]string, len(f.Input))
 	for i, inp := range f.Input {
 		names[i] = inp.Name
@@ -113,7 +113,7 @@ func (f *Flow) InputNames() []string {
 }
 
 // OutputNames returns just the names from the layer's output definitions.
-func (l *Layer) OutputNames() []string {
+func (l *layer) OutputNames() []string {
 	names := make([]string, len(l.Output))
 	for i, out := range l.Output {
 		names[i] = out.Name
@@ -159,7 +159,7 @@ func (e CompileError) Error() string {
 
 // Compile parses and validates the YAML source, returning the compiled
 // Flow or a list of errors.
-func Compile(src []byte) (*Flow, []error) {
+func Compile(src []byte) (*flow, []error) {
 	var errs []error
 
 	// ── Step 1: parse into a raw node to validate keys ──────────────────
@@ -263,16 +263,16 @@ func Compile(src []byte) (*Flow, []error) {
 	}
 
 	// ── Step 2: unmarshal into typed struct ──────────────────────────────
-	var flow Flow
-	if err := yaml.Unmarshal(src, &flow); err != nil {
+	var f flow
+	if err := yaml.Unmarshal(src, &f); err != nil {
 		return nil, []error{fmt.Errorf("unmarshal error: %w", err)}
 	}
 
 	// ── Step 3: required-field checks ───────────────────────────────────
-	if strings.TrimSpace(flow.Name) == "" {
+	if strings.TrimSpace(f.Name) == "" {
 		errs = append(errs, errors.New("top-level 'name' is required"))
 	}
-	for i, l := range flow.Layers {
+	for i, l := range f.Layers {
 		if strings.TrimSpace(l.Name) == "" {
 			errs = append(errs, fmt.Errorf("layer[%d]: 'name' is required", i))
 		}
@@ -289,11 +289,11 @@ func Compile(src []byte) (*Flow, []error) {
 	// internally.
 
 	topInputSet := make(map[string]bool)
-	for _, v := range flow.InputNames() {
+	for _, v := range f.InputNames() {
 		topInputSet[strings.TrimSpace(v)] = true
 	}
 
-	for _, l := range flow.Layers {
+	for _, l := range f.Layers {
 		layerInputSet := make(map[string]bool)
 		for _, v := range l.Input {
 			layerInputSet[strings.TrimSpace(v)] = true
@@ -330,14 +330,14 @@ func Compile(src []byte) (*Flow, []error) {
 	//   2. The layer's outputs are then added to the pool for subsequent layers.
 
 	pool := make(map[string]string) // name -> "where it became available"
-	for _, v := range flow.InputNames() {
+	for _, v := range f.InputNames() {
 		v = strings.TrimSpace(v)
 		if v != "" {
 			pool[v] = "top-level input"
 		}
 	}
 
-	for i, l := range flow.Layers {
+	for i, l := range f.Layers {
 		layerID := fmt.Sprintf("layer[%d] %q", i+1, l.Name)
 		for _, v := range l.Input {
 			vName := strings.TrimSpace(v)
@@ -369,7 +369,7 @@ func Compile(src []byte) (*Flow, []error) {
 		return nil, errs
 	}
 
-	return &flow, nil
+	return &f, nil
 }
 
 // validateKeys checks that every key in a mapping node is in the allowed set.
@@ -420,7 +420,7 @@ func poolNames(pool map[string]string) string {
 // On success it returns success and a nil error.
 // On failure it returns false and a combined error whose message lists every
 // individual compile error, one per line.
-func Run(src []byte) (*Flow, error) {
+func Run(src []byte) (*flow, error) {
 	flow, errs := Compile(src)
 	if len(errs) > 0 {
 		msgs := make([]string, 0, len(errs)+1)

@@ -34,46 +34,29 @@ func (le *LayerEngine) init() {
 	le.flowInputs = map[string][]FlowInput{}
 }
 
-func (le *LayerEngine) GenerateLayers(flow *validator.Flow) ([]Layer, error) {
+func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 	flowInputMap := map[string]FlowInput{}
 	for _, fi := range flow.Input {
-		flowInputMap[fi.Name] = FlowInput{fi}
+		flowInputMap[fi.Name] = fi
 	}
 
 	flowOutputMap := map[string]codegen.Output{}
 
-	layers := make([]Layer, 0, len(flow.Layers))
-
-	for _, layer := range flow.Layers {
+	for i, layer := range flow.Layers {
 		inputs := make([]codegen.Input, len(layer.Input))
-		for i, inpName := range layer.Input {
-
-			if _, exists := flowInputMap[inpName]; exists {
-				inputs[i] = codegen.Input{
-					Name:        inpName,
-					Type:        flowInputMap[inpName].Type,
-					Description: flowInputMap[inpName].Description,
-					Optional:    flowInputMap[inpName].Optional,
-				}
+		for j, inpName := range layer.Input {
+			if fi, exists := flowInputMap[inpName]; exists {
+				codegen.MapToStruct(StructToMap(fi), &inputs[j])
 			} else {
-				inputs[i] = codegen.Input{
-					Name:        inpName,
-					Type:        flowOutputMap[inpName].Type,
-					Description: flowOutputMap[inpName].Description,
-					Optional:    false,
-				}
+				codegen.MapToStruct(StructToMap(flowOutputMap[inpName]), &inputs[j])
+				inputs[j].Optional = false
 			}
-
 		}
 
 		outputs := make([]codegen.Output, len(layer.Output))
-		for i, out := range layer.Output {
-			outputs[i] = codegen.Output{
-				Name:        out.Name,
-				Type:        out.Type,
-				Description: out.Description,
-			}
-			flowOutputMap[out.Name] = outputs[i]
+		for j, out := range layer.Output {
+			codegen.MapToStruct(StructToMap(out), &outputs[j])
+			flowOutputMap[out.Name] = outputs[j]
 		}
 
 		code, err := le.codegen.GenerateLayerFunction(
@@ -83,44 +66,41 @@ func (le *LayerEngine) GenerateLayers(flow *validator.Flow) ([]Layer, error) {
 			outputs,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		layers = append(layers, Layer{
-			layer,
-			nil,
-			code,
-		})
+		flow.Layers[i].Code = code
 	}
 
-	return layers, nil
+	return nil
 }
 
 func (le *LayerEngine) LoadSpec(spec string) error {
-	flow, err := validator.Run([]byte(spec))
+	f, err := validator.Run([]byte(spec))
 	if err != nil {
 		return err
 	}
 
-	layers, err := le.GenerateLayers(flow)
+	var flow Flow
+	MapToStruct(validator.StructToMap(f), &flow)
+
+	err = le.GenerateLayers(&flow)
 	if err != nil {
 		return err
 	}
 
-	layerNames := make([]string, len(layers))
-	for i, layer := range layers {
+	layerNames := make([]string, len(flow.Layers))
+	for i, layer := range flow.Layers {
 		layerNames[i] = layer.Name
 	}
 
-	le.LoadLayers(layers)
+	le.LoadLayers(flow.Layers)
 	le.LoadFlow(map[string][]string{
 		flow.Name: layerNames,
 	})
 
 	engineFlowInputs := make([]FlowInput, len(flow.Input))
-	for i, fi := range flow.Input {
-		engineFlowInputs[i] = FlowInput{fi}
-	}
+	copy(engineFlowInputs, flow.Input)
 	le.flowInputs[flow.Name] = engineFlowInputs
 
 	return nil

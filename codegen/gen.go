@@ -15,17 +15,17 @@ type CodeGen struct {
 
 // Input describes a named layer input for code generation.
 type Input struct {
-	Name        string
-	Type        string
-	Description string
-	Optional    bool
+	Name        string `key:"name"`
+	Type        string `key:"type"`
+	Description string `key:"description"`
+	Optional    bool   `key:"optional"`
 }
 
 // Output describes a named layer output for code generation.
 type Output struct {
-	Name        string
-	Type        string
-	Description string
+	Name        string `key:"name"`
+	Type        string `key:"type"`
+	Description string `key:"description"`
 }
 
 func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {

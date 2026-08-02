@@ -10,7 +10,7 @@ import (
 // Helpers
 // ──────────────────────────────────────────────
 
-func mustCompile(t *testing.T, src string) *Flow {
+func mustCompile(t *testing.T, src string) *flow {
 	t.Helper()
 	flow, err := Run([]byte(src))
 	if err != nil {
