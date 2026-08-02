@@ -15,8 +15,17 @@ type CodeGen struct {
 
 // Input describes a named layer input for code generation.
 type Input struct {
-	Name     string
-	Optional bool
+	Name        string
+	Type        string
+	Description string
+	Optional    bool
+}
+
+// Output describes a named layer output for code generation.
+type Output struct {
+	Name        string
+	Type        string
+	Description string
 }
 
 func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
@@ -38,7 +47,7 @@ func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
 	return cg, nil
 }
 
-func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []Input, outputs []string) (string, error) {
+func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []Input, outputs []Output) (string, error) {
 	switch cg.modelInfo.provider {
 	case ProviderOpenAI:
 		return generateLuaFunctionCode(cg.openAIClient, cg.modelInfo.modelName, fnName, description, inputs, outputs)

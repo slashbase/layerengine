@@ -13,10 +13,10 @@ import (
 // ──────────────────────────────────────────────
 
 type Layer struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Input       []string `yaml:"input"`
-	Output      []string `yaml:"output"`
+	Name        string        `yaml:"name"`
+	Description string        `yaml:"description"`
+	Input       []string      `yaml:"input"`
+	Output      []LayerOutput `yaml:"output"`
 }
 
 type FlowInput struct {
@@ -24,6 +24,12 @@ type FlowInput struct {
 	Type        string `yaml:"type"`
 	Description string `yaml:"description"`
 	Optional    bool   `yaml:"optional"`
+}
+
+type LayerOutput struct {
+	Name        string `yaml:"-"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
 }
 
 func (fi *FlowInput) UnmarshalYAML(value *yaml.Node) error {
@@ -59,6 +65,37 @@ func (fi *FlowInput) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+func (lo *LayerOutput) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("line %d: output item must be a mapping (e.g. 'name: {type: ...}'), got %v", value.Line, value.Kind)
+	}
+	if len(value.Content) != 2 {
+		return fmt.Errorf("line %d: output item mapping must have exactly one key", value.Line)
+	}
+
+	// The first key is the output name
+	lo.Name = value.Content[0].Value
+
+	// The value is the nested mapping with type/description
+	props := value.Content[1]
+	if props.Kind != yaml.MappingNode && !(props.Kind == yaml.ScalarNode && (props.Tag == "!!null" || props.Value == "")) {
+		return fmt.Errorf("line %d: output %q value must be a mapping with type/description or null", value.Line, lo.Name)
+	}
+
+	// Unmarshal the properties into a temporary struct
+	type layerOutputProps struct {
+		Type        string `yaml:"type"`
+		Description string `yaml:"description"`
+	}
+	var p layerOutputProps
+	if err := props.Decode(&p); err != nil {
+		return fmt.Errorf("line %d: output %q: %w", value.Line, lo.Name, err)
+	}
+	lo.Type = p.Type
+	lo.Description = p.Description
+	return nil
+}
+
 type Flow struct {
 	Name        string      `yaml:"name"`
 	Description string      `yaml:"description"`
@@ -71,6 +108,15 @@ func (f *Flow) InputNames() []string {
 	names := make([]string, len(f.Input))
 	for i, inp := range f.Input {
 		names[i] = inp.Name
+	}
+	return names
+}
+
+// OutputNames returns just the names from the layer's output definitions.
+func (l *Layer) OutputNames() []string {
+	names := make([]string, len(l.Output))
+	for i, out := range l.Output {
+		names[i] = out.Name
 	}
 	return names
 }
@@ -89,6 +135,10 @@ var allowedLayerKeys = map[string]bool{
 
 var allowedInputKeys = map[string]bool{
 	"type": true, "description": true, "optional": true,
+}
+
+var allowedOutputKeys = map[string]bool{
+	"type": true, "description": true,
 }
 
 // ──────────────────────────────────────────────
@@ -170,6 +220,40 @@ func Compile(src []byte) (*Flow, []error) {
 				}
 				errs = append(errs, validateKeys(item, allowedLayerKeys,
 					fmt.Sprintf("layer[%d]", idx))...)
+
+				// Validate output items' structure and inner keys
+				for j := 0; j+1 < len(item.Content); j += 2 {
+					if item.Content[j].Value != "output" {
+						continue
+					}
+					outSeq := item.Content[j+1]
+					if outSeq.Kind != yaml.SequenceNode {
+						errs = append(errs, CompileError{outSeq.Line, fmt.Sprintf(
+							"layer[%d] 'output' must be a sequence", idx)})
+						break
+					}
+					for oIdx, oItem := range outSeq.Content {
+						if oItem.Kind != yaml.MappingNode {
+							errs = append(errs, CompileError{oItem.Line, fmt.Sprintf(
+								"layer[%d] output[%d] must be a mapping (e.g. 'name: {type: ...}'), got scalar",
+								idx, oIdx)})
+							continue
+						}
+						if len(oItem.Content) != 2 {
+							errs = append(errs, CompileError{oItem.Line, fmt.Sprintf(
+								"layer[%d] output[%d] mapping must have exactly one key", idx, oIdx)})
+							continue
+						}
+						// Each output item is a single-key mapping: name -> {type, description}
+						// Validate the inner properties keys
+						oInner := oItem.Content[1]
+						if oInner.Kind == yaml.MappingNode {
+							errs = append(errs, validateKeys(oInner, allowedOutputKeys,
+								fmt.Sprintf("layer[%d] output[%d] %q", idx, oIdx, oItem.Content[0].Value))...)
+						}
+					}
+					break
+				}
 			}
 		}
 	}
@@ -215,8 +299,8 @@ func Compile(src []byte) (*Flow, []error) {
 			layerInputSet[strings.TrimSpace(v)] = true
 		}
 		loc := fmt.Sprintf("layer %q", l.Name)
-		for _, v := range l.Output {
-			v = strings.TrimSpace(v)
+		for _, out := range l.Output {
+			v := strings.TrimSpace(out.Name)
 			if v == "" {
 				continue
 			}
@@ -273,8 +357,8 @@ func Compile(src []byte) (*Flow, []error) {
 			}
 		}
 		// After checking, publish this layer's outputs into the pool.
-		for _, v := range l.Output {
-			v = strings.TrimSpace(v)
+		for _, out := range l.Output {
+			v := strings.TrimSpace(out.Name)
 			if v != "" {
 				pool[v] = layerID + " output"
 			}

@@ -18,17 +18,23 @@ layers:
       - number_a
       - number_b
     output:
-      - sum_result
+      - sum_result:
+          type: number
+          description: the sum of number_a and number_b
   - name: multiply_numbers
     description: multiplies the sum by multipier if given or 100.
     input:
       - sum_result
       - multipier
     output:
-      - multiplied_result
+      - multiplied_result:
+          type: number
+          description: the product of sum_result and multipier (or 100 if multipier is absent)
   - name: format_amount
     description: formats the multiplied result into the string "Your final amount is ₹{number}"
     input:
       - multiplied_result
     output:
-      - amount_string
+      - amount_string:
+          type: string
+          description: the formatted rupee amount string

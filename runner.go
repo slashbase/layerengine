@@ -52,7 +52,7 @@ func (cr *LayerRunner) RunFunction(funName string, arguments []lua.LValue, outpu
 
 func (cr *LayerRunner) ReadResult(outputLen int) ([]lua.LValue, error) {
 	values := []lua.LValue{}
-	for i := 0; i < outputLen; i++ {
+	for i := range outputLen {
 		ret := cr.luaRunner.Get(i - outputLen)
 		values = append(values, ret)
 	}

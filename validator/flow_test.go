@@ -63,20 +63,26 @@ layers:
       - number_a
       - number_b
     output:
-      - sum_result
+      - sum_result:
+          type: number
+          description: the sum of number_a and number_b
   - name: multiply_numbers
     description: multiplies the sum by multipier if given or 100.
     input:
       - sum_result
       - multipier
     output:
-      - multiplied_result
+      - multiplied_result:
+          type: number
+          description: the product of sum_result and multipier (or 100 if multipier is absent)
   - name: format_amount
-    description: formats the multiplied result into the string "Your final amount is {number}"
+    description: formats the multiplied result into the string "Your final amount is ₹{number}"
     input:
       - multiplied_result
     output:
-      - amount_string
+      - amount_string:
+          type: string
+          description: the formatted rupee amount string
 `
 
 // ──────────────────────────────────────────────
@@ -131,6 +137,40 @@ func TestTemplateYAML_FlowInputFields(t *testing.T) {
 	}
 }
 
+func TestTemplateYAML_LayerOutputFields(t *testing.T) {
+	flow := mustCompile(t, templateYAML)
+
+	// Layer 0: add_numbers → sum_result
+	out0 := flow.Layers[0].Output[0]
+	if out0.Name != "sum_result" {
+		t.Errorf("Layers[0].Output[0].Name = %q, want %q", out0.Name, "sum_result")
+	}
+	if out0.Type != "number" {
+		t.Errorf("Layers[0].Output[0].Type = %q, want %q", out0.Type, "number")
+	}
+	if out0.Description != "the sum of number_a and number_b" {
+		t.Errorf("Layers[0].Output[0].Description = %q, want %q", out0.Description, "the sum of number_a and number_b")
+	}
+
+	// Layer 1: multiply_numbers → multiplied_result
+	out1 := flow.Layers[1].Output[0]
+	if out1.Name != "multiplied_result" {
+		t.Errorf("Layers[1].Output[0].Name = %q, want %q", out1.Name, "multiplied_result")
+	}
+	if out1.Type != "number" {
+		t.Errorf("Layers[1].Output[0].Type = %q, want %q", out1.Type, "number")
+	}
+
+	// Layer 2: format_amount → amount_string
+	out2 := flow.Layers[2].Output[0]
+	if out2.Name != "amount_string" {
+		t.Errorf("Layers[2].Output[0].Name = %q, want %q", out2.Name, "amount_string")
+	}
+	if out2.Type != "string" {
+		t.Errorf("Layers[2].Output[0].Type = %q, want %q", out2.Type, "string")
+	}
+}
+
 func TestTemplateYAML_PipelineOutputs(t *testing.T) {
 	flow := mustCompile(t, templateYAML)
 	wantOutputs := [][]string{
@@ -144,9 +184,20 @@ func TestTemplateYAML_PipelineOutputs(t *testing.T) {
 			continue
 		}
 		for j, o := range l.Output {
-			if o != wantOutputs[i][j] {
-				t.Errorf("Layers[%d].Output[%d] = %q, want %q", i, j, o, wantOutputs[i][j])
+			if o.Name != wantOutputs[i][j] {
+				t.Errorf("Layers[%d].Output[%d].Name = %q, want %q", i, j, o.Name, wantOutputs[i][j])
 			}
+		}
+	}
+}
+
+func TestTemplateYAML_OutputNamesHelper(t *testing.T) {
+	flow := mustCompile(t, templateYAML)
+	want := []string{"sum_result", "multiplied_result", "amount_string"}
+	for i, l := range flow.Layers {
+		names := l.OutputNames()
+		if len(names) != 1 || names[0] != want[i] {
+			t.Errorf("Layers[%d].OutputNames() = %v, want [%s]", i, names, want[i])
 		}
 	}
 }
@@ -287,6 +338,90 @@ layers:
 }
 
 // ──────────────────────────────────────────────
+// § 4b  Output-specific key enforcement
+// ──────────────────────────────────────────────
+
+func TestBareScalarOutputRejected(t *testing.T) {
+	src := `
+name: flow
+layers:
+  - name: l1
+    input: []
+    output:
+      - result
+`
+	mustFail(t, src, "output[0] must be a mapping", "got scalar")
+}
+
+func TestUnknownOutputKey(t *testing.T) {
+	src := `
+name: flow
+layers:
+  - name: l1
+    input: []
+    output:
+      - result:
+          type: string
+          description: result value
+          bad_key: oops
+`
+	mustFail(t, src, "unknown key", "bad_key")
+}
+
+func TestMultiKeyOutputMappingRejected(t *testing.T) {
+	src := `
+name: flow
+layers:
+  - name: l1
+    input: []
+    output:
+      - first:
+          type: string
+        second:
+          type: string
+`
+	mustFail(t, src, "output[0] mapping must have exactly one key")
+}
+
+func TestOutputOptionalKeyRejected(t *testing.T) {
+	src := `
+name: flow
+layers:
+  - name: l1
+    input: []
+    output:
+      - result:
+          type: string
+          description: result value
+          optional: true
+`
+	mustFail(t, src, "unknown key", "optional")
+}
+
+func TestUnknownOutputKey_ReportsLineNumber(t *testing.T) {
+	src := `name: flow
+layers:
+  - name: l1
+    input: []
+    output:
+      - result:
+          type: string
+          description: ok
+          bad_key: oops
+`
+	errs := mustFail(t, src, "bad_key")
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e.Error(), "line 9") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a CompileError with 'line 9'; errors were:\n%v", errs)
+	}
+}
+
+// ──────────────────────────────────────────────
 // § 5  Input/output collision (same layer)
 // ──────────────────────────────────────────────
 
@@ -302,7 +437,9 @@ layers:
     input:
       - x
     output:
-      - x
+      - x:
+          type: string
+          description: x output
 `
 	mustFail(t, src,
 		`layer "bad_layer"`,
@@ -326,7 +463,9 @@ layers:
   - name: reproduce_layer
     input: []
     output:
-      - val
+      - val:
+          type: string
+          description: val output
 `
 	mustFail(t, src,
 		`layer "reproduce_layer"`,
@@ -371,7 +510,9 @@ layers:
     input:
       - a
     output:
-      - out1
+      - out1:
+          type: string
+          description: first output
   - name: l2
     input:
       - out1
@@ -426,15 +567,24 @@ layers:
   - name: step1
     input:
       - start
-    output: [mid]
+    output:
+      - mid:
+          type: string
+          description: intermediate value
   - name: step2
     input:
       - mid
-    output: [end]
+    output:
+      - end:
+          type: string
+          description: end value
   - name: step3
     input:
       - end
-    output: [final]
+    output:
+      - final:
+          type: string
+          description: final value
 `
 	mustCompile(t, src)
 }
@@ -451,11 +601,17 @@ layers:
   - name: step2
     input:
       - mid
-    output: [end]
+    output:
+      - end:
+          type: string
+          description: end value
   - name: step1
     input:
       - start
-    output: [mid]
+    output:
+      - mid:
+          type: string
+          description: mid value
 `
 	mustFail(t, src, `"mid"`, "not available")
 }
@@ -553,7 +709,9 @@ layers:
     input:
       - "  "
     output:
-      - "  "
+      - "  ":
+          type: string
+          description: blank output
 `
 	mustCompile(t, src)
 }
@@ -570,7 +728,9 @@ layers:
     input:
       - raw
     output:
-      - processed
+      - processed:
+          type: string
+          description: processed output
 `
 	mustCompile(t, src)
 }
@@ -634,8 +794,8 @@ func TestTemplateYAMLFile(t *testing.T) {
 				}
 			}
 		}
-		if len(l.Output) != 1 || l.Output[0] != want.output {
-			t.Errorf("Layers[%d].Output = %v, want [%s]", i, l.Output, want.output)
+		if len(l.Output) != 1 || l.Output[0].Name != want.output {
+			t.Errorf("Layers[%d].Output[0].Name = %v, want [%s]", i, l.Output[0].Name, want.output)
 		}
 	}
 }

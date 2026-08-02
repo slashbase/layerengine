@@ -60,7 +60,7 @@ func runFlow(layers []*Layer, inputValues map[string]any) (interface{}, error) {
 
 		outputValues := ConvertLuaValuesToGoValues(luaOutput)
 		for i, key := range layer.Output {
-			inputValues[key] = outputValues[i]
+			inputValues[key.Name] = outputValues[i]
 		}
 
 	}

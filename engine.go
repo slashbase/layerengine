@@ -40,22 +40,47 @@ func (le *LayerEngine) GenerateLayers(flow *validator.Flow) ([]Layer, error) {
 		flowInputMap[fi.Name] = FlowInput{fi}
 	}
 
+	flowOutputMap := map[string]codegen.Output{}
+
 	layers := make([]Layer, 0, len(flow.Layers))
 
 	for _, layer := range flow.Layers {
 		inputs := make([]codegen.Input, len(layer.Input))
 		for i, inpName := range layer.Input {
-			inputs[i] = codegen.Input{
-				Name:     inpName,
-				Optional: flowInputMap[inpName].Optional,
+
+			if _, exists := flowInputMap[inpName]; exists {
+				inputs[i] = codegen.Input{
+					Name:        inpName,
+					Type:        flowInputMap[inpName].Type,
+					Description: flowInputMap[inpName].Description,
+					Optional:    flowInputMap[inpName].Optional,
+				}
+			} else {
+				inputs[i] = codegen.Input{
+					Name:        inpName,
+					Type:        flowOutputMap[inpName].Type,
+					Description: flowOutputMap[inpName].Description,
+					Optional:    false,
+				}
 			}
+
+		}
+
+		outputs := make([]codegen.Output, len(layer.Output))
+		for i, out := range layer.Output {
+			outputs[i] = codegen.Output{
+				Name:        out.Name,
+				Type:        out.Type,
+				Description: out.Description,
+			}
+			flowOutputMap[out.Name] = outputs[i]
 		}
 
 		code, err := le.codegen.GenerateLayerFunction(
 			layer.Name,
 			layer.Description,
 			inputs,
-			layer.Output,
+			outputs,
 		)
 		if err != nil {
 			return nil, err

@@ -13,7 +13,7 @@ func newAnthropicClient(apiKey string) *anthropic.Client {
 	return &client
 }
 
-func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, fnName, description string, inputs []Input, outputs []string) (string, error) {
+func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, fnName, description string, inputs []Input, outputs []Output) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 
