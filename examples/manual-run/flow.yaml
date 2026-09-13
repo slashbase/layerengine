@@ -1,0 +1,31 @@
+name: string_pipeline
+description: takes a raw string, trims whitespace, uppercases it, and adds a prefix.
+input:
+  - text:
+      type: string
+      description: the raw input string to transform
+layers:
+  - name: trim_whitespace
+    description: removes leading and trailing whitespace from the input string
+    input:
+      - text
+    output:
+      - trimmed:
+          type: string
+          description: the string with no leading or trailing whitespace
+  - name: uppercase
+    description: converts the trimmed string to uppercase
+    input:
+      - trimmed
+    output:
+      - uppercased:
+          type: string
+          description: the trimmed string in all uppercase
+  - name: add_prefix
+    description: "prepends \"PROCESSED: \" to the uppercased string"
+    input:
+      - uppercased
+    output:
+      - result:
+          type: string
+          description: the final string with the prefix added

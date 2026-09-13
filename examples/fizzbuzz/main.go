@@ -27,7 +27,7 @@ func main() {
 	codegenerater, _ := codegen.NewCodeGen(apiKey, modelId)
 	engine := layerengine.NewLayerEngine(codegenerater)
 
-	data, err := os.ReadFile("./template.yaml")
+	data, err := os.ReadFile("./examples/fizzbuzz/flow.yaml")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 		return
@@ -40,11 +40,9 @@ func main() {
 	}
 
 	inputValues := map[string]any{
-		"number_a": 3,
-		"number_b": 5,
-		// "multipier": 10, // optional — defaults to 100 if omitted
+		"count": 15,
 	}
-	output, err := engine.RunFlow("template_test", inputValues)
+	output, err := engine.RunFlow("fizzbuzz", inputValues)
 	if err != nil {
 		fmt.Println(err)
 		return

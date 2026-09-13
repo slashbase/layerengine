@@ -89,19 +89,8 @@ func (le *LayerEngine) LoadSpec(spec string) error {
 		return err
 	}
 
-	layerNames := make([]string, len(flow.Layers))
-	for i, layer := range flow.Layers {
-		layerNames[i] = layer.Name
-	}
-
 	le.LoadLayers(flow.Layers)
-	le.LoadFlow(map[string][]string{
-		flow.Name: layerNames,
-	})
-
-	engineFlowInputs := make([]FlowInput, len(flow.Input))
-	copy(engineFlowInputs, flow.Input)
-	le.flowInputs[flow.Name] = engineFlowInputs
+	le.LoadFlow(flow)
 
 	return nil
 }
@@ -116,14 +105,13 @@ func (le *LayerEngine) LoadLayers(layers []Layer) {
 	}
 }
 
-func (le *LayerEngine) LoadFlow(flows map[string][]string) {
-	for name, layerNames := range flows {
-		layers := []*Layer{}
-		for _, lname := range layerNames {
-			layers = append(layers, le.layers[lname])
-		}
-		le.flows[name] = layers
+func (le *LayerEngine) LoadFlow(flow Flow) {
+	layers := []*Layer{}
+	for _, layer := range flow.Layers {
+		layers = append(layers, le.layers[layer.Name])
 	}
+	le.flows[flow.Name] = layers
+	le.flowInputs[flow.Name] = flow.Input
 }
 
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {

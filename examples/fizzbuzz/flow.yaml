@@ -1,0 +1,31 @@
+name: fizzbuzz
+description: takes a count, generates numbers 1 to count, applies fizzbuzz rules, and returns a newline-formatted string.
+input:
+  - count:
+      type: number
+      description: how many numbers to generate (e.g. 15)
+layers:
+  - name: generate_range
+    description: creates an array of numbers from 1 to count
+    input:
+      - count
+    output:
+      - range_array:
+          type: array
+          description: an array of numbers from 1 to count
+  - name: apply_fizzbuzz
+    description: iterates through the range array and applies fizzbuzz rules — if divisible by both 3 and 5 return "FizzBuzz", else if divisible by 3 return "Fizz", else if divisible by 5 return "Buzz", else return the number as a string
+    input:
+      - range_array
+    output:
+      - fizzbuzz_results:
+          type: array
+          description: an array of fizzbuzz result strings
+  - name: format_output
+    description: joins the fizzbuzz results array into a single colon-separated string
+    input:
+      - fizzbuzz_results
+    output:
+      - final_output:
+          type: string
+          description: the newline-separated fizzbuzz output string

@@ -1,4 +1,4 @@
-name: template_test
+name: arithmetic
 description: takes two numbers, adds them, multiplies the result by 100 or given multiplier, and returns a formatted rupee amount string.
 input:
   - number_a:

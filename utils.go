@@ -7,7 +7,7 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-func ConvertGoValueToLuaValue(input interface{}) lua.LValue {
+func ConvertGoValueToLuaValue(input any) lua.LValue {
 	switch val := input.(type) {
 	case nil:
 		return lua.LNil
@@ -21,6 +21,12 @@ func ConvertGoValueToLuaValue(input interface{}) lua.LValue {
 		return lua.LString(val)
 	case lua.LNumber:
 		return lua.LNumber(val)
+	case []any:
+		tbl := &lua.LTable{}
+		for i, v := range val {
+			tbl.RawSetInt(i+1, ConvertGoValueToLuaValue(v))
+		}
+		return tbl
 	// Add more cases as needed for other types
 	default:
 		panic(fmt.Sprintf("Unsupported type: %T", val))

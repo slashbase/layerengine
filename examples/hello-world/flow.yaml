@@ -1,0 +1,15 @@
+name: hello_world
+description: takes a name and returns a hello world greeting string.
+input:
+  - name:
+      type: string
+      description: the name to greet
+layers:
+  - name: generate_greeting
+    description: returns the string "Hello, {name}! Welcome to Layerengine."
+    input:
+      - name
+    output:
+      - greeting:
+          type: string
+          description: the hello world greeting string
