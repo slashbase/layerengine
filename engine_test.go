@@ -1,7 +1,9 @@
 package layerengine
 
 import (
+	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	lua "github.com/yuin/gopher-lua"
@@ -70,8 +72,74 @@ func TestRunFlowPassesLayerOutputsToFollowingLayers(t *testing.T) {
 	if !ok || len(results) != 1 || results[0] != lua.LNumber(8) {
 		t.Fatalf("RunFlow output = %#v, want []any{8}", output)
 	}
-	if inputs["incremented"] != lua.LNumber(4) || inputs["result"] != lua.LNumber(8) {
-		t.Fatalf("RunFlow did not retain layer outputs in the shared values map: %#v", inputs)
+	if len(inputs) != 1 || inputs["start"] != 3 {
+		t.Fatalf("RunFlow mutated the caller input map: %#v", inputs)
+	}
+}
+
+func TestLayerEngineAllowsConcurrentRunsAndLoads(t *testing.T) {
+	engine := NewBlankLayerEngine()
+	flow := Flow{
+		Name: "double",
+		Layers: []Layer{{
+			Name:   "double",
+			Input:  []string{"value"},
+			Output: []LayerOutput{{Name: "result"}},
+			Code:   "function double(value) return value * 2 end",
+		}},
+	}
+	if err := engine.LoadLayers(flow.Layers); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	if err := engine.LoadFlow(flow); err != nil {
+		t.Fatalf("LoadFlow: %v", err)
+	}
+
+	start := make(chan struct{})
+	errs := make(chan error, 100)
+	var group sync.WaitGroup
+	for range 8 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			for range 20 {
+				output, err := engine.RunFlow(flow.Name, map[string]any{"value": 4})
+				if err != nil {
+					errs <- err
+					return
+				}
+				values := output.([]any)
+				if len(values) != 1 || values[0] != lua.LNumber(8) {
+					errs <- errors.New("unexpected flow output")
+					return
+				}
+			}
+		}()
+	}
+	for range 2 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			for range 20 {
+				if err := engine.LoadLayers(flow.Layers); err != nil {
+					errs <- err
+					return
+				}
+				if err := engine.LoadFlow(flow); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+
+	close(start)
+	group.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }
 

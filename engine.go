@@ -2,12 +2,14 @@ package layerengine
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/slashbase/layerengine/codegen"
 	"github.com/slashbase/layerengine/validator"
 )
 
 type LayerEngine struct {
+	mu         sync.RWMutex
 	layers     map[string]*Layer
 	flows      map[string][]*Layer
 	flowInputs map[string][]FlowInput
@@ -117,6 +119,8 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 		compiledLayers[layer.Name] = &layer
 	}
 
+	le.mu.Lock()
+	defer le.mu.Unlock()
 	for name, layer := range compiledLayers {
 		le.layers[name] = layer
 	}
@@ -126,6 +130,9 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 // LoadFlow registers a flow after confirming that every referenced layer was
 // loaded successfully.
 func (le *LayerEngine) LoadFlow(flow Flow) error {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+
 	layers := make([]*Layer, 0, len(flow.Layers))
 	for _, layer := range flow.Layers {
 		loadedLayer, ok := le.layers[layer.Name]
@@ -140,7 +147,9 @@ func (le *LayerEngine) LoadFlow(flow Flow) error {
 }
 
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
+	le.mu.RLock()
 	layer, ok := le.layers[name]
+	le.mu.RUnlock()
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
@@ -149,16 +158,27 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 }
 
 func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, error) {
+	le.mu.RLock()
 	layers, ok := le.flows[name]
+	if ok {
+		layers = append([]*Layer(nil), layers...)
+	}
+	flowInputs := append([]FlowInput(nil), le.flowInputs[name]...)
+	le.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("flow %q not found", name)
 	}
 
-	for _, fi := range le.flowInputs[name] {
-		_, provided := inputValues[fi.Name]
+	workingValues := make(map[string]any, len(inputValues))
+	for name, value := range inputValues {
+		workingValues[name] = value
+	}
+
+	for _, fi := range flowInputs {
+		_, provided := workingValues[fi.Name]
 		if !provided && !fi.Optional {
 			return nil, fmt.Errorf("required input %q not provided", fi.Name)
 		}
 	}
-	return runFlow(layers, inputValues)
+	return runFlow(layers, workingValues)
 }
