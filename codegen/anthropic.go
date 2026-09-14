@@ -3,6 +3,7 @@ package codegen
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -16,8 +17,10 @@ func newAnthropicClient(apiKey string) *anthropic.Client {
 func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, fnName, description string, inputs []Input, outputs []Output) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
 
-	resp, err := anthropicClient.Messages.New(context.Background(), anthropic.MessageNewParams{
+	resp, err := anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(model),
 		MaxTokens: 1024,
 		System: []anthropic.TextBlockParam{
@@ -30,6 +33,9 @@ func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, 
 	})
 	if err != nil {
 		return "", err
+	}
+	if len(resp.Content) == 0 {
+		return "", errors.New("no content blocks returned by Anthropic")
 	}
 
 	responseBody := resp.Content[0].Text

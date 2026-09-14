@@ -2,10 +2,13 @@ package codegen
 
 import (
 	"errors"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
 )
+
+const requestTimeout = 60 * time.Second
 
 type CodeGen struct {
 	openAIClient    *openai.Client

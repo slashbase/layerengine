@@ -3,13 +3,14 @@ package codegen
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/sashabaranov/go-openai"
 )
 
-func sendChatCompletionRequest(client *openai.Client, chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
+func sendChatCompletionRequest(ctx context.Context, client *openai.Client, chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
 	resp, err := client.CreateChatCompletion(
-		context.Background(),
+		ctx,
 		chatCompletionRequest,
 	)
 	if err != nil {
@@ -21,8 +22,10 @@ func sendChatCompletionRequest(client *openai.Client, chatCompletionRequest open
 func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, description string, inputs []Input, outputs []Output) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
 
-	resp, err := sendChatCompletionRequest(openAIClient, openai.ChatCompletionRequest{
+	resp, err := sendChatCompletionRequest(ctx, openAIClient, openai.ChatCompletionRequest{
 		Model: model,
 		Messages: []openai.ChatCompletionMessage{
 			{
@@ -45,6 +48,9 @@ func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, descrip
 
 	if err != nil {
 		return "", err
+	}
+	if len(resp.Choices) == 0 {
+		return "", errors.New("no completion choices returned by OpenAI")
 	}
 
 	responseBody := resp.Choices[0].Message.Content
