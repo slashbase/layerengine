@@ -89,29 +89,50 @@ func (le *LayerEngine) LoadSpec(spec string) error {
 		return err
 	}
 
-	le.LoadLayers(flow.Layers)
-	le.LoadFlow(flow)
+	if err := le.LoadLayers(flow.Layers); err != nil {
+		return err
+	}
+	if err := le.LoadFlow(flow); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (le *LayerEngine) LoadLayers(layers []Layer) {
+// LoadLayers compiles and loads all layers. It leaves the engine unchanged if
+// any layer cannot be compiled.
+func (le *LayerEngine) LoadLayers(layers []Layer) error {
+	compiledLayers := make(map[string]*Layer, len(layers))
 	for i := range layers {
 		layer := layers[i]
-		if fnProto, err := ParseAndCompileLuaCode(layer.Code); err == nil {
-			layer.FnProto = fnProto
-			le.layers[layer.Name] = &layer
+		fnProto, err := ParseAndCompileLuaCode(layer.Code)
+		if err != nil {
+			return fmt.Errorf("compile layer %q: %w", layer.Name, err)
 		}
+		layer.FnProto = fnProto
+		compiledLayers[layer.Name] = &layer
 	}
+
+	for name, layer := range compiledLayers {
+		le.layers[name] = layer
+	}
+	return nil
 }
 
-func (le *LayerEngine) LoadFlow(flow Flow) {
-	layers := []*Layer{}
+// LoadFlow registers a flow after confirming that every referenced layer was
+// loaded successfully.
+func (le *LayerEngine) LoadFlow(flow Flow) error {
+	layers := make([]*Layer, 0, len(flow.Layers))
 	for _, layer := range flow.Layers {
-		layers = append(layers, le.layers[layer.Name])
+		loadedLayer, ok := le.layers[layer.Name]
+		if !ok || loadedLayer == nil {
+			return fmt.Errorf("load flow %q: layer %q not found", flow.Name, layer.Name)
+		}
+		layers = append(layers, loadedLayer)
 	}
 	le.flows[flow.Name] = layers
 	le.flowInputs[flow.Name] = flow.Input
+	return nil
 }
 
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {

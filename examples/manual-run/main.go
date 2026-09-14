@@ -56,8 +56,14 @@ func main() {
 		layerNames[i] = layer.Name
 	}
 
-	engine.LoadLayers(flow.Layers)
-	engine.LoadFlow(flow)
+	if err := engine.LoadLayers(flow.Layers); err != nil {
+		fmt.Println("Error loading layers:", err)
+		return
+	}
+	if err := engine.LoadFlow(flow); err != nil {
+		fmt.Println("Error loading flow:", err)
+		return
+	}
 
 	inputValues := map[string]any{
 		"text": "layer-engine ",
