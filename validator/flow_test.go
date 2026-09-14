@@ -749,19 +749,19 @@ layers:
 	}
 }
 
-func TestTemplateYAMLFile(t *testing.T) {
-	src, err := os.ReadFile("../examples/template.yaml")
+func TestArithmeticFlowFile(t *testing.T) {
+	src, err := os.ReadFile("../examples/arithmetic/flow.yaml")
 	if err != nil {
-		t.Fatalf("could not read template.yaml: %v", err)
+		t.Fatalf("could not read arithmetic flow: %v", err)
 	}
 
 	flow, err := Run(src)
 	if err != nil {
-		t.Fatalf("template.yaml failed to compile:\n%v", err)
+		t.Fatalf("arithmetic flow failed to compile:\n%v", err)
 	}
 
-	if flow.Name != "template_test" {
-		t.Errorf("Name = %q, want %q", flow.Name, "template_test")
+	if flow.Name != "arithmetic" {
+		t.Errorf("Name = %q, want %q", flow.Name, "arithmetic")
 	}
 	if len(flow.Input) != 3 {
 		t.Errorf("len(Input) = %d, want 3", len(flow.Input))
