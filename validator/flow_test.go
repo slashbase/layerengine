@@ -259,6 +259,16 @@ layers:
 	mustFail(t, src, "layer[0]: 'name' is required")
 }
 
+func TestDuplicateLayerNames(t *testing.T) {
+	src := `
+name: flow
+layers:
+  - name: duplicate
+  - name: duplicate
+`
+	mustFail(t, src, `duplicate layer name "duplicate"`)
+}
+
 // ──────────────────────────────────────────────
 // § 4  Unknown-key enforcement
 // ──────────────────────────────────────────────

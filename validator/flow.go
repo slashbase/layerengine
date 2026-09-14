@@ -272,10 +272,18 @@ func Compile(src []byte) (*flow, []error) {
 	if strings.TrimSpace(f.Name) == "" {
 		errs = append(errs, errors.New("top-level 'name' is required"))
 	}
+	layerNames := make(map[string]struct{}, len(f.Layers))
 	for i, l := range f.Layers {
-		if strings.TrimSpace(l.Name) == "" {
+		name := strings.TrimSpace(l.Name)
+		if name == "" {
 			errs = append(errs, fmt.Errorf("layer[%d]: 'name' is required", i))
+			continue
 		}
+		if _, exists := layerNames[name]; exists {
+			errs = append(errs, fmt.Errorf("layer[%d]: duplicate layer name %q", i, l.Name))
+			continue
+		}
+		layerNames[name] = struct{}{}
 	}
 
 	// ── Step 4: input/output name collision check (per layer) ──────────

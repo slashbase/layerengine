@@ -2,6 +2,7 @@ package layerengine
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/slashbase/layerengine/codegen"
@@ -109,8 +110,15 @@ func (le *LayerEngine) LoadSpec(spec string) error {
 // any layer cannot be compiled.
 func (le *LayerEngine) LoadLayers(layers []Layer) error {
 	compiledLayers := make(map[string]*Layer, len(layers))
+	seenNames := make(map[string]struct{}, len(layers))
 	for i := range layers {
 		layer := layers[i]
+		name := strings.TrimSpace(layer.Name)
+		if _, exists := seenNames[name]; exists {
+			return fmt.Errorf("duplicate layer name %q", layer.Name)
+		}
+		seenNames[name] = struct{}{}
+
 		fnProto, err := ParseAndCompileLuaCode(layer.Code)
 		if err != nil {
 			return fmt.Errorf("compile layer %q: %w", layer.Name, err)
@@ -134,7 +142,14 @@ func (le *LayerEngine) LoadFlow(flow Flow) error {
 	defer le.mu.Unlock()
 
 	layers := make([]*Layer, 0, len(flow.Layers))
+	seenNames := make(map[string]struct{}, len(flow.Layers))
 	for _, layer := range flow.Layers {
+		name := strings.TrimSpace(layer.Name)
+		if _, exists := seenNames[name]; exists {
+			return fmt.Errorf("load flow %q: duplicate layer name %q", flow.Name, layer.Name)
+		}
+		seenNames[name] = struct{}{}
+
 		loadedLayer, ok := le.layers[layer.Name]
 		if !ok || loadedLayer == nil {
 			return fmt.Errorf("load flow %q: layer %q not found", flow.Name, layer.Name)

@@ -158,6 +158,21 @@ func TestLoadLayersDoesNotCommitPartialResults(t *testing.T) {
 	}
 }
 
+func TestLoadLayersRejectsDuplicateNamesWithoutCommit(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	err := engine.LoadLayers([]Layer{
+		{Name: "duplicate", Code: "function duplicate() return 1 end"},
+		{Name: "duplicate", Code: "function duplicate() return 2 end"},
+	})
+	if err == nil || !strings.Contains(err.Error(), `duplicate layer name "duplicate"`) {
+		t.Fatalf("LoadLayers error = %v, want duplicate-name error", err)
+	}
+	if _, loaded := engine.layers["duplicate"]; loaded {
+		t.Fatal("LoadLayers committed layers despite duplicate names")
+	}
+}
+
 func TestLoadFlowReturnsErrorForMissingLayer(t *testing.T) {
 	engine := NewBlankLayerEngine()
 
