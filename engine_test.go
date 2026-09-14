@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+func TestLoadSpecReturnsErrorWithoutCodeGenerator(t *testing.T) {
+	for _, engine := range []*LayerEngine{NewBlankLayerEngine(), NewLayerEngine(nil)} {
+		err := engine.LoadSpec("name: flow\n")
+		if err == nil || !strings.Contains(err.Error(), "code generator is not configured") {
+			t.Fatalf("LoadSpec error = %v, want unconfigured-generator error", err)
+		}
+	}
+}
+
 func TestRunLayerReturnsErrorForUnknownName(t *testing.T) {
 	engine := NewBlankLayerEngine()
 

@@ -35,6 +35,10 @@ func (le *LayerEngine) init() {
 }
 
 func (le *LayerEngine) GenerateLayers(flow *Flow) error {
+	if le.codegen == nil {
+		return fmt.Errorf("code generator is not configured")
+	}
+
 	flowInputMap := map[string]FlowInput{}
 	for _, fi := range flow.Input {
 		flowInputMap[fi.Name] = fi
