@@ -3,6 +3,8 @@ package layerengine
 import (
 	"strings"
 	"testing"
+
+	lua "github.com/yuin/gopher-lua"
 )
 
 func TestLoadSpecReturnsErrorWithoutCodeGenerator(t *testing.T) {
@@ -29,6 +31,47 @@ func TestRunFlowReturnsErrorForUnknownName(t *testing.T) {
 	_, err := engine.RunFlow("missing", nil)
 	if err == nil || !strings.Contains(err.Error(), `flow "missing" not found`) {
 		t.Fatalf("RunFlow error = %v, want missing-flow error", err)
+	}
+}
+
+func TestRunFlowPassesLayerOutputsToFollowingLayers(t *testing.T) {
+	engine := NewBlankLayerEngine()
+	flow := Flow{
+		Name: "chained",
+		Layers: []Layer{
+			{
+				Name:   "increment",
+				Input:  []string{"start"},
+				Output: []LayerOutput{{Name: "incremented"}},
+				Code:   "function increment(start) return start + 1 end",
+			},
+			{
+				Name:   "double",
+				Input:  []string{"incremented"},
+				Output: []LayerOutput{{Name: "result"}},
+				Code:   "function double(incremented) return incremented * 2 end",
+			},
+		},
+	}
+	if err := engine.LoadLayers(flow.Layers); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	if err := engine.LoadFlow(flow); err != nil {
+		t.Fatalf("LoadFlow: %v", err)
+	}
+
+	inputs := map[string]any{"start": 3}
+	output, err := engine.RunFlow(flow.Name, inputs)
+	if err != nil {
+		t.Fatalf("RunFlow: %v", err)
+	}
+
+	results, ok := output.([]any)
+	if !ok || len(results) != 1 || results[0] != lua.LNumber(8) {
+		t.Fatalf("RunFlow output = %#v, want []any{8}", output)
+	}
+	if inputs["incremented"] != lua.LNumber(4) || inputs["result"] != lua.LNumber(8) {
+		t.Fatalf("RunFlow did not retain layer outputs in the shared values map: %#v", inputs)
 	}
 }
 

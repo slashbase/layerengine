@@ -144,7 +144,8 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
-	return runLayer(layer, inputValues)
+	result, err := runLayer(layer, inputValues)
+	return result, err
 }
 
 func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, error) {
