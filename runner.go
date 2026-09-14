@@ -1,6 +1,8 @@
 package layerengine
 
 import (
+	"context"
+
 	"github.com/slashbase/layerengine/modules"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -9,14 +11,15 @@ type LayerRunner struct {
 	luaRunner *lua.LState
 }
 
-func NewLayerRunner() *LayerRunner {
+func NewLayerRunner(ctx context.Context) *LayerRunner {
 	layerRunner := LayerRunner{}
-	layerRunner.init()
+	layerRunner.init(ctx)
 	return &layerRunner
 }
 
-func (cr *LayerRunner) init() {
+func (cr *LayerRunner) init(ctx context.Context) {
 	cr.luaRunner = lua.NewState()
+	cr.luaRunner.SetContext(ctx)
 	modules.Init(cr.luaRunner)
 }
 

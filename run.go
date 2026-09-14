@@ -1,12 +1,20 @@
 package layerengine
 
 import (
+	"context"
+	"time"
+
 	lua "github.com/yuin/gopher-lua"
 )
 
+const layerExecutionTimeout = 15 * time.Second
+
 func runLayer(layer *Layer, inputValues []interface{}) (interface{}, error) {
 
-	layerRunner := NewLayerRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), layerExecutionTimeout)
+	defer cancel()
+
+	layerRunner := NewLayerRunner(ctx)
 	defer layerRunner.Close()
 
 	if err := layerRunner.LoadFunction(layer.FnProto); err != nil {
@@ -34,8 +42,10 @@ func runFlow(layers []*Layer, inputValues map[string]any) (interface{}, error) {
 
 	var luaOutput []lua.LValue
 	for _, layer := range layers {
-		layerRunner := NewLayerRunner()
+		ctx, cancel := context.WithTimeout(context.Background(), layerExecutionTimeout)
+		layerRunner := NewLayerRunner(ctx)
 		defer layerRunner.Close()
+		defer cancel()
 
 		if err := layerRunner.LoadFunction(layer.FnProto); err != nil {
 			return nil, err
