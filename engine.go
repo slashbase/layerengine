@@ -115,17 +115,24 @@ func (le *LayerEngine) LoadFlow(flow Flow) {
 }
 
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
-	return runLayer(le.layers[name], inputValues)
+	layer, ok := le.layers[name]
+	if !ok || layer == nil {
+		return nil, fmt.Errorf("layer %q not found", name)
+	}
+	return runLayer(layer, inputValues)
 }
 
 func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, error) {
-	if flowInputs, ok := le.flowInputs[name]; ok {
-		for _, fi := range flowInputs {
-			_, provided := inputValues[fi.Name]
-			if !provided && !fi.Optional {
-				return nil, fmt.Errorf("required input %q not provided", fi.Name)
-			}
+	layers, ok := le.flows[name]
+	if !ok {
+		return nil, fmt.Errorf("flow %q not found", name)
+	}
+
+	for _, fi := range le.flowInputs[name] {
+		_, provided := inputValues[fi.Name]
+		if !provided && !fi.Optional {
+			return nil, fmt.Errorf("required input %q not provided", fi.Name)
 		}
 	}
-	return runFlow(le.flows[name], inputValues)
+	return runFlow(layers, inputValues)
 }
