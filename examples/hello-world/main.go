@@ -24,7 +24,11 @@ func main() {
 		modelId = codegen.ClaudeSonnet4Dot5
 	}
 
-	codegenerater, _ := codegen.NewCodeGen(apiKey, modelId)
+	codegenerater, err := codegen.NewCodeGen(apiKey, modelId)
+	if err != nil {
+		fmt.Println("Error initializing code generator:", err)
+		return
+	}
 	engine := layerengine.NewLayerEngine(codegenerater)
 
 	data, err := os.ReadFile("./examples/hello-world/flow.yaml")
