@@ -21,19 +21,24 @@ func runLayer(layer *Layer, inputValues []interface{}) (interface{}, error) {
 		return nil, err
 	}
 
-	luaInputs := ConvertGoValuesToLuaValues(inputValues)
+	luaInputs, err := ConvertGoValuesToLuaValues(inputValues)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := layerRunner.RunFunction(layer.Name, luaInputs, len(layer.Output)); err != nil {
 		return nil, err
 	}
 
-	var err error
 	luaOutput, err := layerRunner.ReadResult(len(layer.Output))
 	if err != nil {
 		return nil, err
 	}
 
-	result := ConvertLuaValuesToGoValues(luaOutput)
+	result, err := ConvertLuaValuesToGoValues(luaOutput)
+	if err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
@@ -56,26 +61,34 @@ func runFlow(layers []*Layer, inputValues map[string]any) (interface{}, error) {
 			layerInputValues[i] = inputValues[inpName]
 		}
 
-		luaInputs := ConvertGoValuesToLuaValues(layerInputValues)
+		luaInputs, err := ConvertGoValuesToLuaValues(layerInputValues)
+		if err != nil {
+			return nil, err
+		}
 
 		if err := layerRunner.RunFunction(layer.Name, luaInputs, len(layer.Output)); err != nil {
 			return nil, err
 		}
 
-		var err error
 		luaOutput, err = layerRunner.ReadResult(len(layer.Output))
 		if err != nil {
 			return nil, err
 		}
 
-		outputValues := ConvertLuaValuesToGoValues(luaOutput)
+		outputValues, err := ConvertLuaValuesToGoValues(luaOutput)
+		if err != nil {
+			return nil, err
+		}
 		for i, key := range layer.Output {
 			inputValues[key.Name] = outputValues[i]
 		}
 
 	}
 
-	result := ConvertLuaValuesToGoValues(luaOutput)
+	result, err := ConvertLuaValuesToGoValues(luaOutput)
+	if err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
