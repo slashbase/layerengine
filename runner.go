@@ -14,13 +14,29 @@ type LayerRunner struct {
 func NewLayerRunner(ctx context.Context) *LayerRunner {
 	layerRunner := LayerRunner{}
 	layerRunner.init(ctx)
+	layerRunner.openLibs()
 	return &layerRunner
 }
 
 func (cr *LayerRunner) init(ctx context.Context) {
-	cr.luaRunner = lua.NewState()
+	cr.luaRunner = lua.NewState(lua.Options{
+		SkipOpenLibs: true,
+	})
 	cr.luaRunner.SetContext(ctx)
 	modules.Init(cr.luaRunner)
+}
+
+func (cr *LayerRunner) openLibs() {
+	lua.OpenBase(cr.luaRunner)
+	lua.OpenTable(cr.luaRunner)
+	lua.OpenString(cr.luaRunner)
+	lua.OpenMath(cr.luaRunner)
+	// deliberately NOT opened: os, io, debug, package, channel, coroutine
+	for _, name := range []string{
+		"load", "loadstring", "dofile", "getfenv", "setfenv", "collectgarbage", "newproxy",
+	} {
+		cr.luaRunner.SetGlobal(name, lua.LNil)
+	}
 }
 
 func (cr *LayerRunner) Close() {

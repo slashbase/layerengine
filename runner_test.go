@@ -34,3 +34,25 @@ end
 		t.Fatalf("RunFunction took %s after its context expired", elapsed)
 	}
 }
+
+func TestOsExitCannotKillHost(t *testing.T) {
+	proto, err := ParseAndCompileLuaCode(`
+function exitos()
+  os.exit()
+end
+`)
+	if err != nil {
+		t.Fatalf("compile Lua: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	runner := NewLayerRunner(ctx)
+	defer runner.Close()
+
+	if err := runner.LoadFunction(proto); err != nil {
+		t.Fatalf("load Lua function: %v", err)
+	}
+
+	err = runner.RunFunction("exitos", nil, 0)
+}
