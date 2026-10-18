@@ -18,7 +18,7 @@ The engine then does three things:
 2. **Gets an LLM to write the code.** For each layer, it sends the layer's description and its input/output contract to an LLM (OpenAI or Anthropic). The LLM replies with a small Lua function, which is compiled and stored with the layer.
 3. **Runs the flow.** You pass in your inputs, the engine runs each layer in order, and feeds each layer's output or earlier inputs into the next layer as inputs — like an assembly line. The last layer's output is the flow's result.
 
-For safety, every layer runs in its own private Lua environment with a 15-second timeout. A layer can't hang the engine, and its variables can't leak into other layers — when a layer finishes, its environment is closed before the next one starts.
+For safety, every layer runs in its own private Lua environment with a whitelisted standard library and a 60-second timeout. A layer can't reach the filesystem, spawn a process, or hang the engine, and its variables can't leak into other layers — when a layer finishes, its environment is closed before the next one starts.
 
 ## Quickstart
 
@@ -135,11 +135,13 @@ func main() {
 ## Execution model & safety
 
 - **Per-layer Lua isolation.** Each `runLayer` call spins up a fresh `*lua.LState` and `Close()`s it (and cancels its context) before returning. Globals set by one layer cannot reach the next.
-- **Per-layer timeout.** `layerExecutionTimeout` is 15s; a layer that loops forever is killed, not allowed to hang the flow.
+- **Per-layer timeout.** `layerExecutionTimeout` is 60s; a layer that loops forever is killed, not allowed to hang the flow.
 - **Codegen timeout.** LLM requests use a 60s timeout.
 - **Concurrency safety.** The engine guards its layer/flow registries with an `RWMutex`; `RunFlow` takes defensive copies of the layer slice so a concurrent `LoadSpec` can't mutate a running flow's view.
 
-What is *not* sandboxed today: the Lua layers run with the full gopher-lua runtime (no capability restrictions, no I/O syscall filtering, no memory cap beyond the timeout). This is fine for trusted local use and demos; it is the main reason for the "not for production" warning above.
+**What the layer sandbox covers, and what it doesn't.** Each layer runs with only base, string, table, math and the layer.* module table. os, io, debug and package are not opened, and the dynamic loaders (load, loadstring, dofile, getfenv, setfenv, collectgarbage) are removed. Generated code therefore cannot read files, spawn processes, read the environment, or exit the process — host capability is reachable only through a module you expose deliberately on the layer table.
+
+What is still not covered: there is no hard memory cap. A watchdog samples the process heap every 50 ms and cancels a layer that grows past ~256 MiB, but it is approximate and process-wide, and it is only meaningful for sequential execution — a single very large allocation can overshoot before the poller observes it. True isolation (a kernel-enforced address-space limit) would mean running layers in a child process, which the engine does not do yet. That, together with the experimental status, is why this is still not for production use.
 
 ## Examples
 
