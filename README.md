@@ -1,6 +1,6 @@
 # layerengine
 
-Simple AI generated code running engine based on LLMs & Lua written in Golang
+Simple LLM generated lua code running engine written in Golang
 
 ## 🚧 WIP experimental project.
 
