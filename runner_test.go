@@ -55,4 +55,42 @@ end
 	}
 
 	err = runner.RunFunction("exitos", nil, 0)
+	if err == nil {
+		t.Fatal("failed")
+	}
+}
+
+// TestSandboxHidesHostCapabilities asserts the layer environment exposes none
+// of the host-capable globals. Generated code must go through layer.* for
+// anything beyond pure computation.
+func TestSandboxHidesHostCapabilities(t *testing.T) {
+	proto, err := ParseAndCompileLuaCode(`
+function probe()
+  return tostring(os) .. "," .. tostring(io) .. "," .. tostring(debug) ..
+         "," .. tostring(package) .. "," .. tostring(loadstring) .. "," .. tostring(getfenv)
+end
+`)
+	if err != nil {
+		t.Fatalf("compile probe: %v", err)
+	}
+
+	layer := &Layer{
+		Name:    "probe",
+		Output:  []LayerOutput{{Name: "out", Type: "string"}},
+		FnProto: proto,
+	}
+
+	res, err := runLayer(layer, nil)
+	if err != nil {
+		t.Fatalf("runLayer: %v", err)
+	}
+	if len(res) != 1 {
+		t.Fatalf("expected 1 output, got %d", len(res))
+	}
+
+	got, _ := res[0].(string)
+	const want = "nil,nil,nil,nil,nil,nil"
+	if got != want {
+		t.Fatalf("host capabilities are reachable: got %q, want %q", got, want)
+	}
 }
