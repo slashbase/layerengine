@@ -20,7 +20,10 @@ func NewLayerRunner(ctx context.Context) *LayerRunner {
 
 func (cr *LayerRunner) init(ctx context.Context) {
 	cr.luaRunner = lua.NewState(lua.Options{
-		SkipOpenLibs: true,
+		SkipOpenLibs:    true,
+		CallStackSize:   256,
+		RegistrySize:    256 * 20, // 5120
+		RegistryMaxSize: 256 * 20, // same → growth effectively capped here
 	})
 	cr.luaRunner.SetContext(ctx)
 	modules.Init(cr.luaRunner)
