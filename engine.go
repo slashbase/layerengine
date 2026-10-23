@@ -59,6 +59,10 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 
 	flowOutputMap := map[string]codegen.Output{}
 
+	le.mu.RLock()
+	mods := append([]modules.Module(nil), le.mods...)
+	le.mu.RUnlock()
+
 	for i, layer := range flow.Layers {
 		inputs := make([]codegen.Input, len(layer.Input))
 		for j, inpName := range layer.Input {
@@ -75,10 +79,6 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 			codegen.MapToStruct(StructToMap(out), &outputs[j])
 			flowOutputMap[out.Name] = outputs[j]
 		}
-
-		le.mu.RLock()
-		mods := append([]modules.Module(nil), le.mods...)
-		le.mu.RUnlock()
 
 		code, err := le.codegen.GenerateLayerFunction(
 			layer.Name,
