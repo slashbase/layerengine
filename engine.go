@@ -76,12 +76,16 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 			flowOutputMap[out.Name] = outputs[j]
 		}
 
+		le.mu.RLock()
+		mods := append([]modules.Module(nil), le.mods...)
+		le.mu.RUnlock()
+
 		code, err := le.codegen.GenerateLayerFunction(
 			layer.Name,
 			layer.Description,
 			inputs,
 			outputs,
-			le.mods,
+			mods,
 		)
 		if err != nil {
 			return err
@@ -140,9 +144,7 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 
 	le.mu.Lock()
 	defer le.mu.Unlock()
-	for name, layer := range compiledLayers {
-		le.layers[name] = layer
-	}
+	maps.Copy(le.layers, compiledLayers)
 	return nil
 }
 
@@ -179,7 +181,10 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
-	result, err := runLayer(layer, inputValues, le.mods)
+	le.mu.RLock()
+	mods := append([]modules.Module(nil), le.mods...)
+	le.mu.RUnlock()
+	result, err := runLayer(layer, inputValues, mods)
 	return result, err
 }
 
@@ -204,5 +209,8 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 			return nil, fmt.Errorf("required input %q not provided", fi.Name)
 		}
 	}
-	return runFlow(layers, workingValues, le.mods)
+	le.mu.RLock()
+	mods := append([]modules.Module(nil), le.mods...)
+	le.mu.RUnlock()
+	return runFlow(layers, workingValues, mods)
 }
