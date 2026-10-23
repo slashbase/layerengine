@@ -12,8 +12,8 @@ const (
 
 	environmentFacts = `This function runs in a restricted Lua 5.1 environment.
 Available: the base library, string, table, math, and the layer module table.
-Not available: os, io, debug, package, require, dofile, load, loadstring,
-getfenv, setfenv.`
+Not available: os, io, debug, package, require, loadfile, module, dofile, load,
+loadstring, getfenv, setfenv, collectgarbage, newproxy, channel, coroutine.`
 )
 
 const (
