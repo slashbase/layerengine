@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+
+	"github.com/slashbase/layerengine/modules"
 )
 
 const (
@@ -18,7 +20,7 @@ var (
 	errLayerMemory  = errors.New("layer exceeded memory limit")
 )
 
-func runLayer(layer *Layer, inputValues []any) ([]any, error) {
+func runLayer(layer *Layer, inputValues []any, mods []modules.Module) ([]any, error) {
 
 	parent, cancelMem := context.WithCancelCause(context.Background())
 	defer cancelMem(nil)
@@ -28,7 +30,7 @@ func runLayer(layer *Layer, inputValues []any) ([]any, error) {
 
 	go guardMemory(ctx, cancelMem, layerMemoryLimit, errLayerMemory)
 
-	layerRunner := NewLayerRunner(ctx)
+	layerRunner := NewLayerRunner(ctx, mods)
 	defer layerRunner.Close()
 
 	if err := layerRunner.LoadFunction(layer.FnProto); err != nil {
@@ -57,7 +59,7 @@ func runLayer(layer *Layer, inputValues []any) ([]any, error) {
 	return result, nil
 }
 
-func runFlow(layers []*Layer, inputValues map[string]any) (any, error) {
+func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module) (any, error) {
 	var result []any
 	for _, layer := range layers {
 		layerInputValues := make([]any, len(layer.Input))
@@ -65,7 +67,7 @@ func runFlow(layers []*Layer, inputValues map[string]any) (any, error) {
 			layerInputValues[i] = inputValues[inpName]
 		}
 
-		layerResult, err := runLayer(layer, layerInputValues)
+		layerResult, err := runLayer(layer, layerInputValues, mods)
 		if err != nil {
 			return nil, err
 		}

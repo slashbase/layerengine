@@ -16,6 +16,10 @@ func (System) Name() string {
 	return "system"
 }
 
+func (System) Usage() string {
+	return "versionString = layer.system.version() - get system version"
+}
+
 func (System) printV(l *lua.LState) int {
 	l.Push(lua.LString("v0.0.0"))
 	return 1

@@ -11,10 +11,10 @@ type LayerRunner struct {
 	luaRunner *lua.LState
 }
 
-func NewLayerRunner(ctx context.Context) *LayerRunner {
+func NewLayerRunner(ctx context.Context, mods []modules.Module) *LayerRunner {
 	layerRunner := LayerRunner{}
 	layerRunner.init(ctx)
-	layerRunner.openLibs()
+	layerRunner.openLibsAndMods(mods)
 	return &layerRunner
 }
 
@@ -26,10 +26,9 @@ func (cr *LayerRunner) init(ctx context.Context) {
 		RegistryMaxSize: 256 * 20, // same → growth effectively capped here
 	})
 	cr.luaRunner.SetContext(ctx)
-	modules.Init(cr.luaRunner)
 }
 
-func (cr *LayerRunner) openLibs() {
+func (cr *LayerRunner) openLibsAndMods(mods []modules.Module) {
 	lua.OpenBase(cr.luaRunner)
 	lua.OpenTable(cr.luaRunner)
 	lua.OpenString(cr.luaRunner)
@@ -40,6 +39,7 @@ func (cr *LayerRunner) openLibs() {
 	} {
 		cr.luaRunner.SetGlobal(name, lua.LNil)
 	}
+	modules.Init(cr.luaRunner, mods)
 }
 
 func (cr *LayerRunner) Close() {

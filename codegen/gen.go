@@ -6,6 +6,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	openai "github.com/sashabaranov/go-openai"
+	"github.com/slashbase/layerengine/modules"
 )
 
 const requestTimeout = 60 * time.Second
@@ -50,12 +51,12 @@ func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
 	return cg, nil
 }
 
-func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []Input, outputs []Output) (string, error) {
+func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []Input, outputs []Output, mods []modules.Module) (string, error) {
 	switch cg.modelInfo.provider {
 	case ProviderOpenAI:
-		return generateLuaFunctionCode(cg.openAIClient, cg.modelInfo.modelName, fnName, description, inputs, outputs)
+		return generateLuaFunctionCode(cg.openAIClient, cg.modelInfo.modelName, fnName, description, inputs, outputs, mods)
 	case ProviderAnthropic:
-		return generateLuaFunctionCodeAnthropic(cg.anthropicClient, cg.modelInfo.modelName, fnName, description, inputs, outputs)
+		return generateLuaFunctionCodeAnthropic(cg.anthropicClient, cg.modelInfo.modelName, fnName, description, inputs, outputs, mods)
 	}
 	return "", errors.New("model not supported")
 }

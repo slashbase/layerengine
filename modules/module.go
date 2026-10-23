@@ -8,9 +8,10 @@ import (
 type Module interface {
 	Init(l *lua.LState) *lua.LTable
 	Name() string
+	Usage() string
 }
 
-func allModules() []Module {
+func AllModules() []Module {
 	return []Module{
 		system.System{},
 	}

@@ -2,10 +2,12 @@ package layerengine
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 
 	"github.com/slashbase/layerengine/codegen"
+	"github.com/slashbase/layerengine/modules"
 	"github.com/slashbase/layerengine/validator"
 )
 
@@ -15,11 +17,13 @@ type LayerEngine struct {
 	flows      map[string][]*Layer
 	flowInputs map[string][]FlowInput
 	codegen    *codegen.CodeGen
+	mods       []modules.Module
 }
 
 func NewLayerEngine(codegenertor *codegen.CodeGen) *LayerEngine {
 	layerEngine := &LayerEngine{
 		codegen: codegenertor,
+		mods:    modules.AllModules(),
 	}
 	layerEngine.init()
 	return layerEngine
@@ -35,6 +39,12 @@ func (le *LayerEngine) init() {
 	le.layers = map[string]*Layer{}
 	le.flows = map[string][]*Layer{}
 	le.flowInputs = map[string][]FlowInput{}
+}
+
+func (le *LayerEngine) LoadModules(mods []modules.Module) {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+	le.mods = append(le.mods, mods...)
 }
 
 func (le *LayerEngine) GenerateLayers(flow *Flow) error {
@@ -71,6 +81,7 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 			layer.Description,
 			inputs,
 			outputs,
+			le.mods,
 		)
 		if err != nil {
 			return err
@@ -168,7 +179,7 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
-	result, err := runLayer(layer, inputValues)
+	result, err := runLayer(layer, inputValues, le.mods)
 	return result, err
 }
 
@@ -185,9 +196,7 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 	}
 
 	workingValues := make(map[string]any, len(inputValues))
-	for name, value := range inputValues {
-		workingValues[name] = value
-	}
+	maps.Copy(workingValues, inputValues)
 
 	for _, fi := range flowInputs {
 		_, provided := workingValues[fi.Name]
@@ -195,5 +204,5 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 			return nil, fmt.Errorf("required input %q not provided", fi.Name)
 		}
 	}
-	return runFlow(layers, workingValues)
+	return runFlow(layers, workingValues, le.mods)
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/slashbase/layerengine/modules"
 )
 
 func TestLayerRunnerStopsWhenContextExpires(t *testing.T) {
@@ -18,7 +20,7 @@ end
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	runner := NewLayerRunner(ctx)
+	runner := NewLayerRunner(ctx, []modules.Module{})
 	defer runner.Close()
 
 	if err := runner.LoadFunction(proto); err != nil {
@@ -47,7 +49,7 @@ end
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	runner := NewLayerRunner(ctx)
+	runner := NewLayerRunner(ctx, []modules.Module{})
 	defer runner.Close()
 
 	if err := runner.LoadFunction(proto); err != nil {
@@ -80,7 +82,7 @@ end
 		FnProto: proto,
 	}
 
-	res, err := runLayer(layer, nil)
+	res, err := runLayer(layer, nil, []modules.Module{})
 	if err != nil {
 		t.Fatalf("runLayer: %v", err)
 	}

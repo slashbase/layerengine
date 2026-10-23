@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/slashbase/layerengine/modules"
 )
 
 // TestDeepRecursionIsCatchable verifies the stack bound turns runaway
@@ -29,7 +31,7 @@ end
 		FnProto: proto,
 	}
 
-	res, err := runLayer(layer, []any{1_000_000})
+	res, err := runLayer(layer, []any{1_000_000}, []modules.Module{})
 	if err == nil {
 		t.Fatalf("expected an overflow error, got result %v", res)
 	}

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/sashabaranov/go-openai"
+	"github.com/slashbase/layerengine/modules"
 )
 
 func sendChatCompletionRequest(ctx context.Context, client *openai.Client, chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
@@ -19,7 +20,7 @@ func sendChatCompletionRequest(ctx context.Context, client *openai.Client, chatC
 	return &resp, nil
 }
 
-func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, description string, inputs []Input, outputs []Output) (string, error) {
+func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, description string, inputs []Input, outputs []Output, mods []modules.Module) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
@@ -30,7 +31,7 @@ func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, descrip
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: modulesInfo,
+				Content: GetModuleUsagePrompt(mods),
 			},
 			{
 				Role:    openai.ChatMessageRoleSystem,

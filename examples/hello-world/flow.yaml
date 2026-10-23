@@ -6,7 +6,7 @@ input:
       description: the name to greet
 layers:
   - name: generate_greeting
-    description: returns the string "Hello, {name}! Welcome to Layerengine."
+    description: returns the string "Hello, {name}! Welcome to Layerengine {system version}"
     input:
       - name
     output:

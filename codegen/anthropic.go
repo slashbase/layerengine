@@ -7,6 +7,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/slashbase/layerengine/modules"
 )
 
 func newAnthropicClient(apiKey string) *anthropic.Client {
@@ -14,7 +15,7 @@ func newAnthropicClient(apiKey string) *anthropic.Client {
 	return &client
 }
 
-func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, fnName, description string, inputs []Input, outputs []Output) (string, error) {
+func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, fnName, description string, inputs []Input, outputs []Output, mods []modules.Module) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
@@ -24,7 +25,7 @@ func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, 
 		Model:     anthropic.Model(model),
 		MaxTokens: 1024,
 		System: []anthropic.TextBlockParam{
-			{Text: modulesInfo},
+			{Text: GetModuleUsagePrompt(mods)},
 			{Text: promptGuide},
 		},
 		Messages: []anthropic.MessageParam{
