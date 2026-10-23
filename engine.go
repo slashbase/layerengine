@@ -177,13 +177,11 @@ func (le *LayerEngine) LoadFlow(flow Flow) error {
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	le.mu.RLock()
 	layer, ok := le.layers[name]
+	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
-	le.mu.RLock()
-	mods := append([]modules.Module(nil), le.mods...)
-	le.mu.RUnlock()
 	result, err := runLayer(layer, inputValues, mods)
 	return result, err
 }
@@ -195,6 +193,7 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 		layers = append([]*Layer(nil), layers...)
 	}
 	flowInputs := append([]FlowInput(nil), le.flowInputs[name]...)
+	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("flow %q not found", name)
@@ -209,8 +208,5 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 			return nil, fmt.Errorf("required input %q not provided", fi.Name)
 		}
 	}
-	le.mu.RLock()
-	mods := append([]modules.Module(nil), le.mods...)
-	le.mu.RUnlock()
 	return runFlow(layers, workingValues, mods)
 }
