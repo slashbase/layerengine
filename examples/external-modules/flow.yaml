@@ -1,0 +1,41 @@
+name: weather_report
+description: Looks up the caller's location by IP, fetches the current weather for those coordinates, and formats everything into one summary string.
+input: []
+layers:
+  - name: get_location
+    description: Calls layer.ipinfo.get() and returns the caller's location name and its coordinates.
+    input: []
+    output:
+      - location:
+          type: string
+          description: the location name, e.g. "Berlin, DE"
+      - latitude:
+          type: number
+          description: latitude of the location
+      - longitude:
+          type: number
+          description: longitude of the location
+  - name: get_weather
+    description: Calls layer.weather.current(latitude, longitude) and returns the current temperature and wind speed.
+    input:
+      - latitude
+      - longitude
+    output:
+      - temperature:
+          type: number
+          description: current temperature in degrees Celsius
+      - wind_speed:
+          type: number
+          description: current wind speed in km/h
+  - name: format_report
+    description: Combines the location, coordinates, temperature and wind speed into a single human-readable sentence and returns it as a string.
+    input:
+      - location
+      - latitude
+      - longitude
+      - temperature
+      - wind_speed
+    output:
+      - report:
+          type: string
+          description: one sentence summarising the location and the current weather
