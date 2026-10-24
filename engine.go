@@ -210,3 +210,87 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 	}
 	return runFlow(layers, workingValues, mods)
 }
+
+// Layer returns a copy of a loaded layer by name. The copy carries the
+// generated Lua in its Code field, so callers can inspect or persist it without
+// holding the engine's own value.
+//
+// The copy is shallow: the Input/Output slices and the compiled FnProto are
+// shared with the engine's layer, so read them rather than mutate them.
+func (le *LayerEngine) Layer(name string) (*Layer, bool) {
+	le.mu.RLock()
+	defer le.mu.RUnlock()
+	layer, ok := le.layers[name]
+	if !ok || layer == nil {
+		return nil, false
+	}
+	snapshot := *layer
+	return &snapshot, true
+}
+
+// GenerateLayer generates the Lua source for a single layer of flow, using the
+// flow's declared inputs and the outputs of the layers before it. It does not
+// mutate flow: assign the result to flow.Layers[index].Code yourself, or call
+// GenerateLayers to do the whole flow at once.
+//
+// This is the api for callers that want to retry per layer — regenerate one
+// layer without re-generating the whole flow.
+func (le *LayerEngine) GenerateLayer(flow *Flow, index int) error {
+	if le.codegen == nil {
+		return fmt.Errorf("code generator is not configured")
+	}
+	if index < 0 || index >= len(flow.Layers) {
+		return fmt.Errorf("layer index %d out of range (flow has %d layers)", index, len(flow.Layers))
+	}
+
+	flowInputMap := make(map[string]FlowInput, len(flow.Input))
+	for _, fi := range flow.Input {
+		flowInputMap[fi.Name] = fi
+	}
+
+	// Outputs of earlier layers are available as inputs to this one.
+	flowOutputMap := make(map[string]codegen.Output)
+	for i := range index {
+		for _, out := range flow.Layers[i].Output {
+			var o codegen.Output
+			codegen.MapToStruct(StructToMap(out), &o)
+			flowOutputMap[out.Name] = o
+		}
+	}
+
+	layer := flow.Layers[index]
+
+	inputs := make([]codegen.Input, len(layer.Input))
+	for i, inpName := range layer.Input {
+		if fi, exists := flowInputMap[inpName]; exists {
+			codegen.MapToStruct(StructToMap(fi), &inputs[i])
+		} else {
+			codegen.MapToStruct(StructToMap(flowOutputMap[inpName]), &inputs[i])
+			inputs[i].Optional = false
+		}
+	}
+
+	outputs := make([]codegen.Output, len(layer.Output))
+	for i, out := range layer.Output {
+		codegen.MapToStruct(StructToMap(out), &outputs[i])
+	}
+
+	le.mu.RLock()
+	mods := append([]modules.Module(nil), le.mods...)
+	le.mu.RUnlock()
+
+	code, err := le.codegen.GenerateLayerFunction(
+		layer.Name,
+		layer.Description,
+		inputs,
+		outputs,
+		mods,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	flow.Layers[index].Code = code
+	return nil
+}
