@@ -229,12 +229,11 @@ func (le *LayerEngine) Layer(name string) (*Layer, bool) {
 }
 
 // GenerateLayer generates the Lua source for a single layer of flow, using the
-// flow's declared inputs and the outputs of the layers before it. It does not
-// mutate flow: assign the result to flow.Layers[index].Code yourself, or call
-// GenerateLayers to do the whole flow at once.
+// flow's declared inputs and the outputs of the layers before it, and stores it
+// on flow.Layers[index].Code.
 //
-// This is the api for callers that want to retry per layer — regenerate one
-// layer without re-generating the whole flow.
+// This is the API for callers that want to retry per layer — regenerate one
+// layer without regenerating the whole flow.
 func (le *LayerEngine) GenerateLayer(flow *Flow, index int) error {
 	if le.codegen == nil {
 		return fmt.Errorf("code generator is not configured")
