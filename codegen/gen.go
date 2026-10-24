@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go/v3"
 	"github.com/slashbase/layerengine/modules"
 )
 
@@ -44,7 +44,7 @@ func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
 
 	switch info.provider {
 	case ProviderOpenAI:
-		cg.openAIClient = openai.NewClient(apiKey)
+		cg.openAIClient = newOpenAIClient(apiKey)
 	case ProviderAnthropic:
 		cg.anthropicClient = newAnthropicClient(apiKey)
 	}

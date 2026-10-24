@@ -18,7 +18,7 @@ func main() {
 	var modelId codegen.ModelID
 	if OPENAI_API_KEY != "" {
 		apiKey = OPENAI_API_KEY
-		modelId = codegen.GPT3Dot5Turbo
+		modelId = codegen.GPT6Luna
 	}
 	if ANTHROPIC_API_KEY != "" {
 		apiKey = ANTHROPIC_API_KEY

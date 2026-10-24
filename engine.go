@@ -90,6 +90,7 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println("code: ", code)
 
 		flow.Layers[i].Code = code
 	}

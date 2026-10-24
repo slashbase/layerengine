@@ -2,7 +2,7 @@ package codegen
 
 import (
 	"github.com/anthropics/anthropic-sdk-go"
-	openai "github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go/v3"
 )
 
 // Provider identifies an LLM backend.
@@ -20,13 +20,16 @@ type ModelID string
 
 const (
 	// OpenAI
-	GPT3Dot5Turbo ModelID = "gpt-3.5-turbo"
-	GPT4Turbo     ModelID = "gpt-4-turbo"
-	GPT4o         ModelID = "gpt-4o"
-	GPT4oMini     ModelID = "gpt-4o-mini"
-	O1            ModelID = "o1"
-	O3Mini        ModelID = "o3-mini"
-	GPT5          ModelID = "gpt-5"
+	GPT6_1Sol   ModelID = "gpt-6.1-sol"
+	GPT6Sol     ModelID = "gpt-6-sol"
+	GPT6Luna    ModelID = "gpt-6-luna"
+	GPT6Astra   ModelID = "gpt-6-astra"
+	GPT5_6Sol   ModelID = "gpt-5.6-sol"
+	GPT5_6Terra ModelID = "gpt-5.6-terra"
+	GPT5_6Luna  ModelID = "gpt-5.6-luna"
+	GPT5_5      ModelID = "gpt-5.5"
+	GPT5_4Mini  ModelID = "gpt-5.4-mini"
+	GPT5_2      ModelID = "gpt-5.2"
 
 	// Anthropic
 	ClaudeSonnet4     ModelID = "claude-sonnet-4"
@@ -44,13 +47,16 @@ type modelInfo struct {
 // models is the single source of truth mapping a ModelID to its provider and
 // SDK name. Add a model by adding one entry here.
 var models = map[ModelID]modelInfo{
-	GPT3Dot5Turbo: {ProviderOpenAI, openai.GPT3Dot5Turbo},
-	GPT4Turbo:     {ProviderOpenAI, openai.GPT4Turbo},
-	GPT4o:         {ProviderOpenAI, openai.GPT4o},
-	GPT4oMini:     {ProviderOpenAI, openai.GPT4oMini},
-	O1:            {ProviderOpenAI, openai.O1},
-	O3Mini:        {ProviderOpenAI, openai.O3Mini},
-	GPT5:          {ProviderOpenAI, openai.GPT5},
+	GPT6_1Sol:   {ProviderOpenAI, string(openai.ChatModelGPT6_1Sol)},
+	GPT6Sol:     {ProviderOpenAI, string(openai.ChatModelGPT6Sol)},
+	GPT6Luna:    {ProviderOpenAI, string(openai.ChatModelGPT6Luna)},
+	GPT6Astra:   {ProviderOpenAI, string(openai.ChatModelGPT6Astra)},
+	GPT5_6Sol:   {ProviderOpenAI, string(openai.ChatModelGPT5_6Sol)},
+	GPT5_6Terra: {ProviderOpenAI, string(openai.ChatModelGPT5_6Terra)},
+	GPT5_6Luna:  {ProviderOpenAI, string(openai.ChatModelGPT5_6Luna)},
+	GPT5_5:      {ProviderOpenAI, string(openai.ChatModelGPT5_5)},
+	GPT5_4Mini:  {ProviderOpenAI, string(openai.ChatModelGPT5_4Mini)},
+	GPT5_2:      {ProviderOpenAI, string(openai.ChatModelGPT5_2)},
 
 	ClaudeSonnet4:     {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_0)},
 	ClaudeSonnet4Dot5: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_5)},

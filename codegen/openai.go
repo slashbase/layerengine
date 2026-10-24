@@ -5,61 +5,46 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"github.com/slashbase/layerengine/modules"
 )
 
-func sendChatCompletionRequest(ctx context.Context, client *openai.Client, chatCompletionRequest openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	resp, err := client.CreateChatCompletion(
-		ctx,
-		chatCompletionRequest,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &resp, nil
+func newOpenAIClient(apiKey string) *openai.Client {
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	return &client
 }
 
 func generateLuaFunctionCode(openAIClient *openai.Client, model, fnName, description string, inputs []Input, outputs []Output, mods []modules.Module) (string, error) {
 
 	prompt := generateCodePromptFormat(fnName, description, inputs, outputs)
+
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	resp, err := sendChatCompletionRequest(ctx, openAIClient, openai.ChatCompletionRequest{
-		Model: model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: GetModuleUsagePrompt(mods),
-			},
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: promptGuide,
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: prompt,
-			},
+	resp, err := openAIClient.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel(model),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(GetModuleUsagePrompt(mods)),
+			openai.SystemMessage(promptGuide),
+			openai.UserMessage(prompt),
 		},
-		ResponseFormat: &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONObject: &openai.ResponseFormatJSONObjectParam{},
 		},
 	})
-
 	if err != nil {
 		return "", err
 	}
+
 	if len(resp.Choices) == 0 {
 		return "", errors.New("no completion choices returned by OpenAI")
 	}
 
-	responseBody := resp.Choices[0].Message.Content
 	var response struct {
 		Code string `json:"code"`
 	}
-	err = json.Unmarshal([]byte(responseBody), &response)
-	if err != nil {
+	if err := json.Unmarshal([]byte(resp.Choices[0].Message.Content), &response); err != nil {
 		return "", err
 	}
 
