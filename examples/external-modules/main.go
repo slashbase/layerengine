@@ -22,7 +22,7 @@ func main() {
 	}
 	if ANTHROPIC_API_KEY != "" {
 		apiKey = ANTHROPIC_API_KEY
-		modelId = codegen.ClaudeSonnet4Dot5
+		modelId = codegen.ClaudeSonnet5_5
 	}
 
 	codegenerater, err := codegen.NewCodeGen(apiKey, modelId)

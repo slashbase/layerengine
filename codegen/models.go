@@ -32,11 +32,12 @@ const (
 	GPT5_2      ModelID = "gpt-5.2"
 
 	// Anthropic
-	ClaudeSonnet4     ModelID = "claude-sonnet-4"
-	ClaudeSonnet4Dot5 ModelID = "claude-sonnet-4.5"
-	ClaudeOpus4       ModelID = "claude-opus-4"
-	ClaudeOpus4Dot6   ModelID = "claude-opus-4.6"
-	ClaudeSonnet4Dot6 ModelID = "claude-sonnet-4.6"
+	ClaudeFable5_1  ModelID = "claude-fable-5-1"
+	ClaudeOpus5_5   ModelID = "claude-opus-5-5"
+	ClaudeSonnet5_5 ModelID = "claude-sonnet-5-5"
+	ClaudeHaiku5_5  ModelID = "claude-haiku-5-5"
+	ClaudeOpus4_6   ModelID = "claude-opus-4.6"
+	ClaudeSonnet4_6 ModelID = "claude-sonnet-4.6"
 )
 
 type modelInfo struct {
@@ -58,9 +59,10 @@ var models = map[ModelID]modelInfo{
 	GPT5_4Mini:  {ProviderOpenAI, string(openai.ChatModelGPT5_4Mini)},
 	GPT5_2:      {ProviderOpenAI, string(openai.ChatModelGPT5_2)},
 
-	ClaudeSonnet4:     {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_0)},
-	ClaudeSonnet4Dot5: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_5)},
-	ClaudeOpus4:       {ProviderAnthropic, string(anthropic.ModelClaudeOpus4_0)},
-	ClaudeOpus4Dot6:   {ProviderAnthropic, string(anthropic.ModelClaudeOpus4_6)},
-	ClaudeSonnet4Dot6: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_6)},
+	ClaudeFable5_1:  {ProviderAnthropic, string(anthropic.ModelClaudeFable5_1)},
+	ClaudeOpus5_5:   {ProviderAnthropic, string(anthropic.ModelClaudeOpus5_5)},
+	ClaudeSonnet5_5: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet5_5)},
+	ClaudeHaiku5_5:  {ProviderAnthropic, string(anthropic.ModelClaudeHaiku5_5)},
+	ClaudeOpus4_6:   {ProviderAnthropic, string(anthropic.ModelClaudeOpus4_6)},
+	ClaudeSonnet4_6: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_6)},
 }
