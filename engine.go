@@ -293,3 +293,7 @@ func (le *LayerEngine) GenerateLayer(flow *Flow, index int) error {
 	flow.Layers[index].Code = code
 	return nil
 }
+
+func (le *LayerEngine) GetModules() []modules.Module {
+	return le.mods
+}
