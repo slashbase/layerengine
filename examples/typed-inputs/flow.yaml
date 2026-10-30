@@ -1,0 +1,23 @@
+name: typed_inputs
+description: takes an integer, a boolean and a string, and reports them back in one line.
+input:
+  - count:
+      type: integer
+      description: how many items to report (e.g. 7)
+  - enabled:
+      type: boolean
+      description: whether the feature is switched on
+  - label:
+      type: string
+      description: a short label to include in the report
+layers:
+  - name: describe_inputs
+    description: compares count against 10, branches on enabled, and joins label into a single report string. Each argument is used in a way that needs its declared type — a comparison, a truth test and a concatenation — so a stringly-typed argument is visible in the output rather than absorbed silently.
+    input:
+      - count
+      - enabled
+      - label
+    output:
+      - report:
+          type: string
+          description: one line naming label, stating whether enabled is true, and whether count is above 10

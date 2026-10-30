@@ -186,7 +186,16 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	return result, err
 }
 
+// RunFlow runs a loaded flow. Input values are converted to the types the flow
+// declares, and arguments the flow does not declare are dropped; see
+// CoerceInputs for the rules. Callers that want a different policy — strict type
+// checking, or forwarding undeclared arguments — use RunFlowWithOptions.
 func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, error) {
+	return le.RunFlowWithOptions(name, inputValues, CoerceOptions{})
+}
+
+// RunFlowWithOptions is RunFlow with an explicit input policy.
+func (le *LayerEngine) RunFlowWithOptions(name string, inputValues map[string]any, opts CoerceOptions) (any, error) {
 	le.mu.RLock()
 	layers, ok := le.flows[name]
 	if ok {
@@ -199,14 +208,9 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 		return nil, fmt.Errorf("flow %q not found", name)
 	}
 
-	workingValues := make(map[string]any, len(inputValues))
-	maps.Copy(workingValues, inputValues)
-
-	for _, fi := range flowInputs {
-		_, provided := workingValues[fi.Name]
-		if !provided && !fi.Optional {
-			return nil, fmt.Errorf("required input %q not provided", fi.Name)
-		}
+	workingValues, err := CoerceInputs(flowInputs, inputValues, opts)
+	if err != nil {
+		return nil, err
 	}
 	return runFlow(layers, workingValues, mods)
 }

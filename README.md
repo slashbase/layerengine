@@ -181,6 +181,7 @@ What is still not covered: there is no hard memory cap. A watchdog samples the p
 | `fizzbuzz`         | branching-ish logic inside generated Lua                  |
 | `manual-run`       | engine loads the flows manually without LoadSpec method   |
 | `external-modules` | two custom modules calling live HTTP APIs across three layers |
+| `typed-inputs`     | input coercion: lenient conversion, Strict rejection, undeclared arguments |
 
 Each example lives under `examples/<name>/`. Most are a `flow.yaml` and a `main.go`; `external-modules` also carries the module implementations it registers.
 

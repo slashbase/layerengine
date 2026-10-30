@@ -66,7 +66,7 @@ func (fi *flowInput) UnmarshalYAML(value *yaml.Node) error {
 	if err := props.Decode(&p); err != nil {
 		return fmt.Errorf("line %d: input %q: %w", value.Line, fi.Name, err)
 	}
-	fi.Type = p.Type
+	fi.Type = normaliseType(p.Type)
 	fi.Description = p.Description
 	fi.Optional = p.Optional
 	return nil
@@ -98,7 +98,7 @@ func (lo *layerOutput) UnmarshalYAML(value *yaml.Node) error {
 	if err := props.Decode(&p); err != nil {
 		return fmt.Errorf("line %d: output %q: %w", value.Line, lo.Name, err)
 	}
-	lo.Type = p.Type
+	lo.Type = normaliseType(p.Type)
 	lo.Description = p.Description
 	return nil
 }
@@ -140,6 +140,19 @@ var allowedInputKeys = map[string]bool{
 var allowedOutputKeys = map[string]bool{
 	"type": true, "description": true,
 }
+
+// allowedTypes is the vocabulary for the value of an input's or output's `type`
+// key. It is JSON Schema's: coerce.go converts string, number, integer and
+// boolean, while array and object are accepted and passed through untouched.
+// An absent or empty type is also allowed, and means the value is not coerced.
+var allowedTypes = map[string]bool{
+	"string": true, "number": true, "integer": true,
+	"boolean": true, "array": true, "object": true,
+}
+
+// allowedTypeList is the fixed order used in error messages, so that the same
+// spec always produces the same message.
+const allowedTypeList = "array, boolean, integer, number, object, string"
 
 // ──────────────────────────────────────────────
 // Compiler
@@ -203,8 +216,9 @@ func Compile(src []byte) (*flow, []error) {
 				// Validate the inner properties keys
 				inner := item.Content[1]
 				if inner.Kind == yaml.MappingNode {
-					errs = append(errs, validateKeys(inner, allowedInputKeys,
-						fmt.Sprintf("input[%d] %q", idx, item.Content[0].Value))...)
+					context := fmt.Sprintf("input[%d] %q", idx, item.Content[0].Value)
+					errs = append(errs, validateKeys(inner, allowedInputKeys, context)...)
+					errs = append(errs, validateTypeValue(inner, context)...)
 				}
 			}
 		case "layers":
@@ -248,8 +262,9 @@ func Compile(src []byte) (*flow, []error) {
 						// Validate the inner properties keys
 						oInner := oItem.Content[1]
 						if oInner.Kind == yaml.MappingNode {
-							errs = append(errs, validateKeys(oInner, allowedOutputKeys,
-								fmt.Sprintf("layer[%d] output[%d] %q", idx, oIdx, oItem.Content[0].Value))...)
+							context := fmt.Sprintf("layer[%d] output[%d] %q", idx, oIdx, oItem.Content[0].Value)
+							errs = append(errs, validateKeys(oInner, allowedOutputKeys, context)...)
+							errs = append(errs, validateTypeValue(oInner, context)...)
 						}
 					}
 					break
@@ -396,6 +411,40 @@ func validateKeys(node *yaml.Node, allowed map[string]bool, context string) []er
 		}
 	}
 	return errs
+}
+
+// validateTypeValue checks the value of a `type` key against allowedTypes. It
+// runs in Step 1, where the yaml nodes still carry line numbers.
+//
+// Without it a typo such as `type: str` compiles: the bad name is rendered into
+// the codegen prompt as written, and it silently disables input coercion, since
+// CoerceInputs passes an unrecognised type through untouched.
+func validateTypeValue(node *yaml.Node, context string) []error {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value != "type" {
+			continue
+		}
+		value := node.Content[i+1]
+		if value.Kind != yaml.ScalarNode {
+			return []error{CompileError{value.Line, fmt.Sprintf(
+				"%s: 'type' must be a scalar, got %v", context, value.Kind)}}
+		}
+		name := normaliseType(value.Value)
+		if name == "" {
+			return nil
+		}
+		if !allowedTypes[name] {
+			return []error{CompileError{value.Line, fmt.Sprintf(
+				"%s has unknown type %q (allowed: %s)", context, value.Value, allowedTypeList)}}
+		}
+	}
+	return nil
+}
+
+// normaliseType trims and lowercases a declared type, so the rest of the
+// package only ever sees one spelling of it.
+func normaliseType(declaredType string) string {
+	return strings.ToLower(strings.TrimSpace(declaredType))
 }
 
 func allowedKeyList(m map[string]bool) string {

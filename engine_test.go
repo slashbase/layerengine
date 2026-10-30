@@ -39,7 +39,8 @@ func TestRunFlowReturnsErrorForUnknownName(t *testing.T) {
 func TestRunFlowPassesLayerOutputsToFollowingLayers(t *testing.T) {
 	engine := NewBlankLayerEngine()
 	flow := Flow{
-		Name: "chained",
+		Name:  "chained",
+		Input: []FlowInput{{Name: "start", Type: "number"}},
 		Layers: []Layer{
 			{
 				Name:   "increment",
@@ -80,7 +81,8 @@ func TestRunFlowPassesLayerOutputsToFollowingLayers(t *testing.T) {
 func TestLayerEngineAllowsConcurrentRunsAndLoads(t *testing.T) {
 	engine := NewBlankLayerEngine()
 	flow := Flow{
-		Name: "double",
+		Name:  "double",
+		Input: []FlowInput{{Name: "value", Type: "number"}},
 		Layers: []Layer{{
 			Name:   "double",
 			Input:  []string{"value"},

@@ -809,3 +809,106 @@ func TestArithmeticFlowFile(t *testing.T) {
 		}
 	}
 }
+
+// ──────────────────────────────────────────────
+// Type vocabulary
+// ──────────────────────────────────────────────
+
+func TestCompileAcceptsEveryKnownType(t *testing.T) {
+	for _, declaredType := range []string{"string", "number", "integer", "boolean", "array", "object"} {
+		src := `
+name: types
+input:
+  - value:
+      type: ` + declaredType + `
+layers:
+  - name: echo
+    description: echoes the value
+    input:
+      - value
+    output:
+      - echoed:
+          type: ` + declaredType + `
+`
+		f := mustCompile(t, src)
+		if got := f.Input[0].Type; got != declaredType {
+			t.Errorf("input type %q decoded as %q", declaredType, got)
+		}
+		if got := f.Layers[0].Output[0].Type; got != declaredType {
+			t.Errorf("output type %q decoded as %q", declaredType, got)
+		}
+	}
+}
+
+func TestCompileNormalisesDeclaredTypeCase(t *testing.T) {
+	f := mustCompile(t, `
+name: types
+input:
+  - value:
+      type: Number
+layers:
+  - name: echo
+    input:
+      - value
+    output:
+      - echoed:
+          type: STRING
+`)
+	if got := f.Input[0].Type; got != "number" {
+		t.Errorf("Input[0].Type = %q, want %q", got, "number")
+	}
+	if got := f.Layers[0].Output[0].Type; got != "string" {
+		t.Errorf("Output[0].Type = %q, want %q", got, "string")
+	}
+}
+
+func TestCompileRejectsUnknownInputType(t *testing.T) {
+	mustFail(t, `
+name: types
+input:
+  - count:
+      type: str
+layers:
+  - name: echo
+    input:
+      - count
+    output:
+      - echoed:
+          type: string
+`, `input[0] "count" has unknown type "str"`,
+		"allowed: array, boolean, integer, number, object, string")
+}
+
+func TestCompileRejectsUnknownOutputType(t *testing.T) {
+	mustFail(t, `
+name: types
+input:
+  - count:
+      type: number
+layers:
+  - name: echo
+    input:
+      - count
+    output:
+      - echoed:
+          type: Str
+`, `layer[0] output[0] "echoed" has unknown type "Str"`)
+}
+
+func TestCompileAllowsUntypedInput(t *testing.T) {
+	f := mustCompile(t, `
+name: untyped
+input:
+  - value:
+layers:
+  - name: echo
+    input:
+      - value
+    output:
+      - echoed:
+          type: string
+`)
+	if got := f.Input[0].Type; got != "" {
+		t.Errorf("Input[0].Type = %q, want empty", got)
+	}
+}
