@@ -1,6 +1,6 @@
 # layerengine
 
-Simple LLM generated lua code running engine written in Golang
+Simple LLM generated lua code running engine lib written in Golang.
 
 ## 🚧 WIP experimental project.
 
