@@ -5,26 +5,17 @@ import (
 	"os"
 
 	"github.com/slashbase/layerengine"
-	"github.com/slashbase/layerengine/codegen"
+	"github.com/slashbase/layerengine/config"
 )
 
 func main() {
 
-	OPENAI_API_KEY := os.Getenv("OPENAI_API_KEY")
-	ANTHROPIC_API_KEY := os.Getenv("ANTHROPIC_API_KEY")
-
-	var apiKey string
-	var modelId codegen.ModelID
-	if OPENAI_API_KEY != "" {
-		apiKey = OPENAI_API_KEY
-		modelId = codegen.GPT6Luna
+	cfg, err := config.FromEnv()
+	if err != nil {
+		fmt.Println("Error reading config:", err)
+		return
 	}
-	if ANTHROPIC_API_KEY != "" {
-		apiKey = ANTHROPIC_API_KEY
-		modelId = codegen.ClaudeSonnet5_5
-	}
-
-	codegenerater, err := codegen.NewCodeGen(apiKey, modelId)
+	codegenerater, err := cfg.CodeGen()
 	if err != nil {
 		fmt.Println("Error initializing code generator:", err)
 		return

@@ -106,12 +106,17 @@ import (
 	"os"
 
 	"github.com/slashbase/layerengine"
-	"github.com/slashbase/layerengine/codegen"
+	"github.com/slashbase/layerengine/config"
 )
 
 func main() {
-	// Provide Provider Model API key and pick a model.
-	generator, err := codegen.NewCodeGen(os.Getenv("OPENAI_API_KEY"), codegen.GPT4o)
+	// FromEnv picks a provider from OPENAI_API_KEY or ANTHROPIC_API_KEY.
+	// For an explicit choice, build a config.Config{Model: ..., APIKey: ...}.
+	cfg, err := config.FromEnv()
+	if err != nil {
+		panic(err)
+	}
+	generator, err := cfg.CodeGen()
 	if err != nil {
 		panic(err)
 	}

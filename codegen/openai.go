@@ -10,8 +10,12 @@ import (
 	"github.com/slashbase/layerengine/modules"
 )
 
-func newOpenAIClient(apiKey string) *openai.Client {
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+func newOpenAIClient(apiKey, baseURL string) *openai.Client {
+	opts := []option.RequestOption{option.WithAPIKey(apiKey)}
+	if baseURL != "" {
+		opts = append(opts, option.WithBaseURL(baseURL))
+	}
+	client := openai.NewClient(opts...)
 	return &client
 }
 

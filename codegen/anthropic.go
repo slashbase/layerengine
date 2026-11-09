@@ -10,8 +10,12 @@ import (
 	"github.com/slashbase/layerengine/modules"
 )
 
-func newAnthropicClient(apiKey string) *anthropic.Client {
-	client := anthropic.NewClient(option.WithAPIKey(apiKey))
+func newAnthropicClient(apiKey, baseURL string) *anthropic.Client {
+	opts := []option.RequestOption{option.WithAPIKey(apiKey)}
+	if baseURL != "" {
+		opts = append(opts, option.WithBaseURL(baseURL))
+	}
+	client := anthropic.NewClient(opts...)
 	return &client
 }
 
