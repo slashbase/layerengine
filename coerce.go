@@ -38,17 +38,20 @@ type CoerceOptions struct {
 // input that is absent from args, or present as nil, is skipped when it is
 // Optional and reported as missing otherwise.
 //
-// The type vocabulary is JSON Schema's. The recognised types are:
+// The type vocabulary is JSON Schema's. validator/flow.go rejects an unknown
+// value of `type` when the spec is loaded, so a typo such as "str" never
+// reaches this function. `type` is itself optional; an input that omits it is
+// passed through untouched.
+//
+// Of the six types the validator accepts, this function converts four:
 //
 //	string   numbers and booleans are formatted; arrays and objects are rejected
 //	number   a numeric string is parsed; other non-numbers are rejected
 //	integer  as number, plus the value must be a whole number
 //	boolean  a "true"/"false" string is parsed; other non-booleans are rejected
 //
-// Anything else — "array", "object", or a typo such as "str" — passes through
-// untouched, because validator/flow.go validates the keys under an input but
-// never the value of its type. A flow that says "str" therefore gets no
-// coercion at all, silently.
+// "array" and "object" are accepted but not converted: a caller that sends a
+// slice or a map is already sending the shape the layer expects.
 //
 // A value that already has the declared type is returned as-is and keeps its Go
 // type: an int stays an int, a float64 stays a float64. Only converted values
