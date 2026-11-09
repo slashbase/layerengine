@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/slashbase/layerengine/modules"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -30,6 +31,23 @@ func (IPInfo) Usage() string {
 --   location  (string)  e.g. "Berlin, DE"
 --   latitude  (number)
 --   longitude (number)`
+}
+
+func (IPInfo) Manifest() modules.Manifest {
+	return modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Notes:      "Geolocates the machine running this layer, not the caller's user.",
+		Functions: []modules.Function{
+			{
+				Name: "get",
+				Doc:  "Looks up the location of this host's IP.",
+				Returns: []modules.Return{{
+					Name: "info",
+					Type: "table{location:string, latitude:number, longitude:number}",
+				}},
+			},
+		},
+	}
 }
 
 func (IPInfo) Init(l *lua.LState) *lua.LTable {
@@ -113,6 +131,27 @@ func (Weather) Usage() string {
 --   temperature (number)  degrees Celsius
 --   wind_speed  (number)  km/h
 --   time        (string)  observation time`
+}
+
+func (Weather) Manifest() modules.Manifest {
+	return modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Notes:      "Coordinates are WGS84; times are UTC.",
+		Functions: []modules.Function{
+			{
+				Name: "current",
+				Doc:  "Current weather for a coordinate. Degrees Celsius and km/h.",
+				Params: []modules.Param{
+					{Name: "latitude", Type: "number"},
+					{Name: "longitude", Type: "number"},
+				},
+				Returns: []modules.Return{{
+					Name: "weather",
+					Type: "table{temperature:number, wind_speed:number, time:string}",
+				}},
+			},
+		},
+	}
 }
 
 func (Weather) Init(l *lua.LState) *lua.LTable {

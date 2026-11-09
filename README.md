@@ -143,15 +143,41 @@ func main() {
 
 A layer's Lua starts with pure computation only — the standard library is deliberately narrow (see [Execution model & safety](#execution-model--safety)). Real work happens through a **module**: a small Go type that publishes functions on the `layer` table and describes itself so the LLM knows how to call it.
 
-A module implements three methods:
+A module implements four methods:
 
 ```go
 type Module interface {
 	Name() string                    // key on the layer table: "weather" → layer.weather
 	Init(l *lua.LState) *lua.LTable  // the functions to expose
-	Usage() string                   // how to call it; rendered into the codegen prompt
+	Usage() string                   // free-text; used by codegen as notes; rendered only when Manifest is zero
+	Manifest() modules.Manifest      // used by codegen; the functions it exposes, as data
 }
 ```
+
+The manifest declares each function once, as data, instead of relying on prose the model has to parse:
+
+```go
+func (Weather) Manifest() modules.Manifest {
+	return modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Notes: "fetches live weather from live weather API",
+		Functions: []modules.Function{{
+			Name:    "temperature",
+			Doc:     "Temperature in degrees Celsius for a city.",
+			Params:  []modules.Param{{Name: "city", Type: "string"}},
+			Returns: []modules.Return{{Name: "celsius", Type: "number"}},
+		}},
+	}
+}
+```
+
+With a manifest, each function renders as a single call-shaped line, the way a module author would write it by hand — return names on the left, types inline, the doc after a dash:
+
+```
+celsius:number = layer.weather.temperature(city:string) - Temperature in degrees Celsius for a city.
+```
+
+`Notes` renders once per module in the same shape: `layer.weather - fetches live weather from live weather API.` A module's `Usage()` is only rendered when it declares nothing — the zero `modules.Manifest{}` — and then it appears under a `layer.<name>` heading. Modules and functions are sorted, so the same module set always produces the same prompt. `modules.Validate(mods)` reports duplicate module names and malformed manifests.
 
 Register modules on the engine before loading a flow:
 
@@ -160,7 +186,7 @@ engine := layerengine.NewLayerEngine(generator)
 engine.LoadModules([]modules.Module{Module1{}, Module2{}})
 ```
 
-Two things happen. The modules are installed on every layer's `layer` table, and each `Usage()` string is rendered into the prompt sent to the LLM — so the generated code knows the calls exist and what they return. `LoadModules` added new modules to engine along with built-in `system` modules.
+Two things happen. The modules are installed on every layer's `layer` table, and each module's surface is rendered into the prompt sent to the LLM — so the generated code knows the calls exist, their arity, and what they return. `LoadModules` adds new modules to the engine alongside the built-in `system` module.
 
 The [`external-modules`](examples/external-modules) example is a complete worked version: two modules over two live APIs, wired through three layers.
 

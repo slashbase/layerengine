@@ -1,6 +1,7 @@
 package system
 
 import (
+	"github.com/slashbase/layerengine/modules/manifest"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -18,6 +19,21 @@ func (System) Name() string {
 
 func (System) Usage() string {
 	return "versionString = layer.system.version() - get system version"
+}
+
+// Manifest declares the module's surface as data. codegen renders the signature
+// lines from this and keeps Usage() underneath as notes.
+func (System) Manifest() manifest.Manifest {
+	return manifest.Manifest{
+		APIVersion: manifest.APIVersion,
+		Functions: []manifest.Function{
+			{
+				Name:    "version",
+				Doc:     "get system version",
+				Returns: []manifest.Return{{Name: "versionString", Type: "string"}},
+			},
+		},
+	}
 }
 
 func (System) printV(l *lua.LState) int {
