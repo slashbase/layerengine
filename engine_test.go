@@ -189,3 +189,38 @@ func TestLoadFlowReturnsErrorForMissingLayer(t *testing.T) {
 		t.Fatal("LoadFlow registered a flow with a missing layer")
 	}
 }
+
+func TestLoadLayersRejectsCodeThatDoesNotDefineTheLayerFunction(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	err := engine.LoadLayers([]Layer{
+		{Name: "add_numbers", Code: "function addNumbers(a, b) return a + b end"},
+	})
+	if err == nil || !strings.Contains(err.Error(), `layer "add_numbers": generated code does not define a global function "add_numbers"`) {
+		t.Fatalf("LoadLayers error = %v, want missing-function error", err)
+	}
+	if _, loaded := engine.layers["add_numbers"]; loaded {
+		t.Fatal("LoadLayers committed a layer whose code does not define it")
+	}
+}
+
+func TestLoadLayersRejectsCodeThatDefinesNoFunction(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	err := engine.LoadLayers([]Layer{{Name: "noop", Code: "local x = 1"}})
+	if err == nil || !strings.Contains(err.Error(), "does not define a global function") {
+		t.Fatalf("LoadLayers error = %v, want missing-function error", err)
+	}
+	if _, loaded := engine.layers["noop"]; loaded {
+		t.Fatal("LoadLayers committed a layer whose code defines no function")
+	}
+}
+
+func TestLoadLayersReportsChunkErrorAtLoadTime(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	err := engine.LoadLayers([]Layer{{Name: "boom", Code: `error("kaboom")`}})
+	if err == nil || !strings.Contains(err.Error(), "kaboom") {
+		t.Fatalf("LoadLayers error = %v, want the chunk's own error", err)
+	}
+}

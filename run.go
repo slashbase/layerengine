@@ -59,6 +59,38 @@ func runLayer(layer *Layer, inputValues []any, mods []modules.Module) ([]any, er
 	return result, nil
 }
 
+// checkLayerDefinesFunction executes layer's compiled chunk in a throwaway
+// sandbox and reports whether it defines a global function named after the
+// layer. The runner looks the function up by that name at call time, so a chunk
+// that defines nothing — or defines it under a different name — would otherwise
+// fail at RunFlow with a nil-call error far from the cause.
+//
+// The chunk's top-level statements run here as well as at run time; a generated
+// layer is expected to contain nothing but the function definition.
+func checkLayerDefinesFunction(layer *Layer, mods []modules.Module) error {
+	parent, cancelMem := context.WithCancelCause(context.Background())
+	defer cancelMem(nil)
+
+	ctx, cancelTimeout := context.WithTimeoutCause(parent, layerExecutionTimeout, errLayerTimeout)
+	defer cancelTimeout()
+
+	go guardMemory(ctx, cancelMem, layerMemoryLimit, errLayerMemory)
+
+	layerRunner := NewLayerRunner(ctx, mods)
+	defer layerRunner.Close()
+
+	if err := layerRunner.LoadFunction(layer.FnProto); err != nil {
+		return wrapRunErr(layer, ctx, err)
+	}
+	if !layerRunner.HasGlobalFunction(layer.Name) {
+		return fmt.Errorf(
+			"layer %q: generated code does not define a global function %q (expected `function %s(...)`)",
+			layer.Name, layer.Name, layer.Name,
+		)
+	}
+	return nil
+}
+
 func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module) (any, error) {
 	var result []any
 	for _, layer := range layers {

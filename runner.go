@@ -61,6 +61,11 @@ func (cr *LayerRunner) LoadFunction(fnProto *lua.FunctionProto) error {
 	return nil
 }
 
+func (cr *LayerRunner) HasGlobalFunction(name string) bool {
+	_, ok := cr.luaRunner.GetGlobal(name).(*lua.LFunction)
+	return ok
+}
+
 func (cr *LayerRunner) RunFunction(funName string, arguments []lua.LValue, outputLen int) error {
 	if err := cr.luaRunner.CallByParam(lua.P{
 		Fn:      cr.luaRunner.GetGlobal(funName),

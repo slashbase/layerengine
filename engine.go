@@ -122,8 +122,13 @@ func (le *LayerEngine) LoadSpec(spec string) error {
 }
 
 // LoadLayers compiles and loads all layers. It leaves the engine unchanged if
-// any layer cannot be compiled.
+// any layer cannot be compiled, or if a compiled chunk does not define a global
+// function named after its layer.
 func (le *LayerEngine) LoadLayers(layers []Layer) error {
+	le.mu.RLock()
+	mods := append([]modules.Module(nil), le.mods...)
+	le.mu.RUnlock()
+
 	compiledLayers := make(map[string]*Layer, len(layers))
 	seenNames := make(map[string]struct{}, len(layers))
 	for i := range layers {
@@ -139,6 +144,14 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 			return fmt.Errorf("compile layer %q: %w", layer.Name, err)
 		}
 		layer.FnProto = fnProto
+
+		// Compiling proves the code parses; it does not prove the chunk defines
+		// the function the runner looks up by name. Check that here so a
+		// misnamed or empty layer fails at load, not at RunFlow.
+		if err := checkLayerDefinesFunction(&layer, mods); err != nil {
+			return err
+		}
+
 		compiledLayers[layer.Name] = &layer
 	}
 
