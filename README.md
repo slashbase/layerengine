@@ -177,6 +177,8 @@ With a manifest, each function renders as a single call-shaped line, the way a m
 celsius:number = layer.weather.temperature(city:string) - Temperature in degrees Celsius for a city.
 ```
 
+An argument with a `Default` renders as `limit?:number=10` and may be omitted by the generated code, whether or not `Optional` is set.
+
 `Notes` renders once per module in the same shape: `layer.weather - fetches live weather from live weather API.` A module's `Usage()` is only rendered when it declares nothing — the zero `modules.Manifest{}` — and then it appears under a `layer.<name>` heading. Modules and functions are sorted, so the same module set always produces the same prompt. `modules.Validate(mods)` reports duplicate module names and malformed manifests.
 
 Register modules on the engine before loading a flow:

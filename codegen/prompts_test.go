@@ -132,3 +132,34 @@ func TestGetModuleUsagePromptIsDeterministic(t *testing.T) {
 		t.Errorf("modules are not sorted by name:\n%s", forward)
 	}
 }
+
+// defaultsModule exercises argument defaults: a default must render, and must
+// make the argument omittable even when Optional is unset.
+type defaultsModule struct{}
+
+func (defaultsModule) Name() string { return "defaults" }
+
+func (defaultsModule) Usage() string { return "" }
+
+func (defaultsModule) Init(l *lua.LState) *lua.LTable { return l.NewTable() }
+
+func (defaultsModule) Manifest() modules.Manifest {
+	return modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Functions: []modules.Function{{
+			Name:    "list",
+			Doc:     "List items.",
+			Params:  []modules.Param{{Name: "limit", Type: "number", Default: "10"}},
+			Returns: []modules.Return{{Name: "items", Type: "table"}},
+		}},
+	}
+}
+
+func TestGetModuleUsagePromptRendersDefault(t *testing.T) {
+	got := GetModuleUsagePrompt([]modules.Module{defaultsModule{}})
+
+	want := "items:table = layer.defaults.list(limit?:number=10) - List items."
+	if !strings.Contains(got, want) {
+		t.Fatalf("prompt is missing %q\ngot:\n%s", want, got)
+	}
+}

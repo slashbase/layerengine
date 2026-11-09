@@ -97,12 +97,16 @@ func renderCallLine(module string, fn modules.Function) string {
 			b.WriteString(", ")
 		}
 		b.WriteString(p.Name)
-		if p.Optional {
+		if omittable(p) {
 			b.WriteString("?")
 		}
 		if p.Type != "" {
 			b.WriteString(":")
 			b.WriteString(p.Type)
+		}
+		if p.Default != "" {
+			b.WriteString("=")
+			b.WriteString(p.Default)
 		}
 	}
 	b.WriteString(")")
@@ -113,6 +117,13 @@ func renderCallLine(module string, fn modules.Function) string {
 	}
 
 	return b.String()
+}
+
+// omittable reports whether the caller may leave the argument out: it is marked
+// Optional, or it declares a Default. Both render the same way, so a default
+// always shows up as an optional argument.
+func omittable(p modules.Param) bool {
+	return p.Optional || p.Default != ""
 }
 
 // namedReturns renders "a:type, b:type" for the returns that carry a name, or ""

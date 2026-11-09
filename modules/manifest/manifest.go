@@ -43,19 +43,23 @@ type Function struct {
 // Param is one argument. Type is a prompt-level type expression, not an
 // enforced one: "string", "number", "boolean", "table", or a table shape such
 // as "table{city:string, limit:number}".
+//
+// Default is rendered verbatim into the prompt as name?:type=default, and makes
+// the argument omittable whether or not Optional is set. Per-argument prose has
+// no home here — the one-line call format has no room for it — so describe
+// arguments in Function.Doc instead.
 type Param struct {
 	Name     string
 	Type     string
 	Optional bool
 	Default  string
-	Doc      string
 }
 
-// Return is one value the function hands back.
+// Return is one value the function hands back. Type carries the field names when
+// the value is a table; say what it means in Function.Doc.
 type Return struct {
 	Name string
 	Type string
-	Doc  string
 }
 
 // IsZero reports that the module declares no surface at all. A zero manifest is
