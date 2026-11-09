@@ -3,6 +3,7 @@ package validator
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -452,6 +453,7 @@ func allowedKeyList(m map[string]bool) string {
 	for k := range m {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return strings.Join(keys, ", ")
 }
 
