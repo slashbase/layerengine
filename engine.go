@@ -42,12 +42,7 @@ func (le *LayerEngine) init() {
 }
 
 // LoadModules adds modules to the engine, after holding the set to what it
-// claims. Two checks, in this order:
-//
-//   - modules.Validate, which needs no sandbox: names are identifiers, not
-//     reserved words, not duplicated, and every non-zero manifest is sound.
-//   - checkModuleNamesAreFree, which needs one: a module name is a global, so
-//     it cannot shadow the standard library or a loader the sandbox removed.
+// claims. See checkModules for the three checks and their order.
 //
 // A rejected set leaves the engine unchanged. This is where the checks belong
 // because it is where the module set becomes final: a module accepted here is
@@ -57,10 +52,7 @@ func (le *LayerEngine) LoadModules(mods []modules.Module) error {
 	defer le.mu.Unlock()
 
 	combined := append(append([]modules.Module(nil), le.mods...), mods...)
-	if err := modules.Validate(combined); err != nil {
-		return err
-	}
-	if err := checkModuleNamesAreFree(combined); err != nil {
+	if err := checkModules(combined); err != nil {
 		return err
 	}
 	le.mods = combined

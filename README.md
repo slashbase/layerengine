@@ -192,7 +192,9 @@ if err := engine.LoadModules([]modules.Module{Module1{}, Module2{}}); err != nil
 
 Two things happen. Each module table is bound as a **global named after the module** in every layer's sandbox — so `modname` is `modname.fnname(...)`, and each module's surface is rendered into the prompt sent to the LLM, so the generated code knows the calls exist, their arity, and what they return. `LoadModules` adds new modules to the engine alongside the built-in `system` module.
 
-Because a module name is a global, it has to be free in the sandbox, so `LoadModules` checks it and can fail: a module called `string` would replace the standard library's string table, and one called `load` would put back a loader the sandbox removed — both rejected with the name in the error, and a rejected set leaves the engine unchanged. The reserved set is read off a real sandbox rather than hardcoded, so opening another library later cannot leave the check behind.
+Because a module name is a global, it has to be free in the sandbox, so `LoadModules` checks it and can fail: a module called `string` would replace the standard library's string table, and one called `print` would replace a base-library function the prompt says is available — both rejected with the name in the error, and a rejected set leaves the engine unchanged. The reserved set is read off a real sandbox rather than hardcoded, so opening another library later cannot leave the check behind.
+
+`LoadModules` also holds the manifest to what `Init` actually published. Every declared path has to be a function on the table the module returned, so a manifest that names `shapes.circle.area` while `Init` builds a flat table fails at registration with the full path in the error, instead of as a nil index inside a layer that names neither the module nor the manifest. A module with the zero manifest is skipped: there is no declaration to hold it to.
 
 The [`external-modules`](examples/external-modules) example is a complete worked version: two modules over two live APIs, wired through three layers.
 

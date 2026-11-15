@@ -131,6 +131,60 @@ func checkModuleNamesAreFree(mods []modules.Module) error {
 	return nil
 }
 
+// checkModules holds a module set to everything it claims, before any layer can
+// use it. The order is cheapest first, and each step assumes the one before it
+// passed.
+func checkModules(mods []modules.Module) error {
+	if err := modules.Validate(mods); err != nil {
+		return err
+	}
+	if err := checkModuleNamesAreFree(mods); err != nil {
+		return err
+	}
+	return checkModulesPublishDeclaredSurface(mods)
+}
+
+// checkModulesPublishDeclaredSurface walks every module's declared function
+// paths on the table its Init built.
+//
+// Manifest.Validate checks the shape of a name; only Init knows whether the
+// table it returns really holds a function there. Without this, a module can
+// declare shapes.circle.area and publish a flat table, and nothing notices
+// until a layer calls the path and dies on a nil index that names neither the
+// module nor the manifest. A module whose manifest is zero or does not validate
+// is skipped: codegen falls back to its Usage() text for those, so there is no
+// declaration to hold Init to.
+func checkModulesPublishDeclaredSurface(mods []modules.Module) error {
+	if len(mods) == 0 {
+		return nil
+	}
+
+	// No timeout and no memory guard: no layer code runs here, the runner is
+	// only read from.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runner := NewLayerRunner(ctx, mods)
+	defer runner.Close()
+
+	for _, mod := range mods {
+		man := mod.Manifest()
+		if man.IsZero() || man.Validate() != nil {
+			continue
+		}
+		for _, fn := range man.Functions {
+			if !runner.GlobalFunctionAt(mod.Name(), fn.Name) {
+				return fmt.Errorf(
+					"module %q declares %s.%s but no function is published there",
+					mod.Name(), mod.Name(), fn.Name,
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
 func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module) (any, error) {
 	var result []any
 	for _, layer := range layers {

@@ -2,6 +2,7 @@ package layerengine
 
 import (
 	"context"
+	"strings"
 
 	"github.com/slashbase/layerengine/modules"
 	lua "github.com/yuin/gopher-lua"
@@ -68,6 +69,22 @@ func (cr *LayerRunner) HasGlobalFunction(name string) bool {
 
 func (cr *LayerRunner) HasGlobal(name string) bool {
 	return cr.luaRunner.GetGlobal(name) != lua.LNil
+}
+
+// GlobalFunctionAt reports whether the dotted path under global root resolves to
+// a function: GlobalFunctionAt("shapes", "circle.area") is true when
+// shapes.circle.area is a function. Every segment but the last must be a table.
+func (cr *LayerRunner) GlobalFunctionAt(root, path string) bool {
+	value := cr.luaRunner.GetGlobal(root)
+	for _, segment := range strings.Split(path, ".") {
+		table, ok := value.(*lua.LTable)
+		if !ok {
+			return false
+		}
+		value = table.RawGetString(segment)
+	}
+	_, ok := value.(*lua.LFunction)
+	return ok
 }
 
 func (cr *LayerRunner) RunFunction(funName string, arguments []lua.LValue, outputLen int) error {
