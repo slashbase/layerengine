@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -152,6 +153,91 @@ func (defaultsModule) Manifest() modules.Manifest {
 			Params:  []modules.Param{{Name: "limit", Type: "number", Default: "10"}},
 			Returns: []modules.Return{{Name: "items", Type: "table"}},
 		}},
+	}
+}
+
+// groupsModule publishes two groups of two operations each, declared out of
+// order: the shape a module takes once a manifest name is a dotted path.
+type groupsModule struct{}
+
+func (groupsModule) Name() string { return "shapes" }
+
+func (groupsModule) Usage() string { return "" }
+
+func (groupsModule) Init(l *lua.LState) *lua.LTable {
+	circle := l.NewTable()
+	circle.RawSetString("area", l.NewFunction(noop))
+	circle.RawSetString("perimeter", l.NewFunction(noop))
+
+	rect := l.NewTable()
+	rect.RawSetString("area", l.NewFunction(noop))
+	rect.RawSetString("perimeter", l.NewFunction(noop))
+
+	t := l.NewTable()
+	t.RawSetString("circle", circle)
+	t.RawSetString("rect", rect)
+	return t
+}
+
+func (groupsModule) Manifest() modules.Manifest {
+	return modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Functions: []modules.Function{
+			{
+				Name:    "rect.perimeter",
+				Doc:     "Perimeter of a rectangle.",
+				Params:  []modules.Param{{Name: "width", Type: "number"}, {Name: "height", Type: "number"}},
+				Returns: []modules.Return{{Name: "perimeter", Type: "number"}},
+			},
+			{
+				Name:    "circle.area",
+				Doc:     "Area of a circle from its radius.",
+				Params:  []modules.Param{{Name: "radius", Type: "number"}},
+				Returns: []modules.Return{{Name: "area", Type: "number"}},
+			},
+			{
+				Name:    "rect.area",
+				Doc:     "Area of a rectangle.",
+				Params:  []modules.Param{{Name: "width", Type: "number"}, {Name: "height", Type: "number"}},
+				Returns: []modules.Return{{Name: "area", Type: "number"}},
+			},
+			{
+				Name:    "circle.perimeter",
+				Doc:     "Perimeter of a circle from its radius.",
+				Params:  []modules.Param{{Name: "radius", Type: "number"}},
+				Returns: []modules.Return{{Name: "perimeter", Type: "number"}},
+			},
+		},
+	}
+}
+
+func noop(*lua.LState) int { return 0 }
+
+// callLines returns the call lines rendered for module, in prompt order.
+func callLines(prompt, module string) []string {
+	marker := module + "."
+	var lines []string
+	for _, line := range strings.Split(prompt, "\n") {
+		if i := strings.Index(line, marker); i >= 0 {
+			lines = append(lines, line[i:])
+		}
+	}
+	return lines
+}
+
+// TestGetModuleUsagePromptGroupsDottedNames asserts the whole ordered slice, so
+// a group's operations staying adjacent is pinned rather than inferred.
+func TestGetModuleUsagePromptGroupsDottedNames(t *testing.T) {
+	got := GetModuleUsagePrompt([]modules.Module{groupsModule{}})
+
+	want := []string{
+		"area:number = shapes.circle.area(radius:number) - Area of a circle from its radius.",
+		"perimeter:number = shapes.circle.perimeter(radius:number) - Perimeter of a circle from its radius.",
+		"area:number = shapes.rect.area(width:number, height:number) - Area of a rectangle.",
+		"perimeter:number = shapes.rect.perimeter(width:number, height:number) - Perimeter of a rectangle.",
+	}
+	if lines := callLines(got, "shapes"); !slices.Equal(lines, want) {
+		t.Fatalf("dotted names are not grouped by path\nwant: %q\ngot:  %q", want, lines)
 	}
 }
 

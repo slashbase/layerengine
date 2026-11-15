@@ -42,17 +42,80 @@ func TestManifestValidateAcceptsValid(t *testing.T) {
 	}
 }
 
+// TestManifestValidateAcceptsGroupedNames pins the supported shape: one module,
+// several groups, each operation a path into the table Init builds.
+func TestManifestValidateAcceptsGroupedNames(t *testing.T) {
+	m := modules.Manifest{
+		APIVersion: modules.APIVersion,
+		Notes:      "lengths in, lengths out",
+		Functions: []modules.Function{
+			{
+				Name:    "circle.area",
+				Doc:     "Area of a circle from its radius.",
+				Params:  []modules.Param{{Name: "radius", Type: "number"}},
+				Returns: []modules.Return{{Name: "area", Type: "number"}},
+			},
+			{
+				Name:    "circle.perimeter",
+				Doc:     "Perimeter of a circle from its radius.",
+				Params:  []modules.Param{{Name: "radius", Type: "number"}},
+				Returns: []modules.Return{{Name: "perimeter", Type: "number"}},
+			},
+			{
+				Name:    "rect.area",
+				Doc:     "Area of a rectangle.",
+				Params:  []modules.Param{{Name: "width", Type: "number"}, {Name: "height", Type: "number"}},
+				Returns: []modules.Return{{Name: "area", Type: "number"}},
+			},
+		},
+	}
+
+	if err := m.Validate(); err != nil {
+		t.Fatalf("grouped function names rejected: %v", err)
+	}
+}
+
+// TestManifestValidateAcceptsLayerSegment pins that "layer" is an ordinary
+// segment: the module name is the first segment at the call site, so a group
+// called layer is a group like any other.
+func TestManifestValidateAcceptsLayerSegment(t *testing.T) {
+	m := validManifest()
+	m.Functions[0].Name = "layer.current"
+
+	if err := m.Validate(); err != nil {
+		t.Fatalf("layer as a group name rejected: %v", err)
+	}
+}
+
 func TestManifestValidateRejects(t *testing.T) {
 	cases := map[string]func(*modules.Manifest){
 		"no functions":        func(m *modules.Manifest) { m.Functions = nil },
 		"unsupported version": func(m *modules.Manifest) { m.APIVersion = 99 },
 		"unnamed function":    func(m *modules.Manifest) { m.Functions[0].Name = "" },
-		"qualified function":  func(m *modules.Manifest) { m.Functions[0].Name = "layer.current" },
 		"duplicate function": func(m *modules.Manifest) {
 			m.Functions = append(m.Functions, m.Functions[0])
 		},
 		"unnamed param":  func(m *modules.Manifest) { m.Functions[0].Params[0].Name = "" },
 		"untyped return": func(m *modules.Manifest) { m.Functions[0].Returns[0].Type = "" },
+
+		// A name is a dotted path, but only as paths of Lua identifiers.
+		"empty segment":  func(m *modules.Manifest) { m.Functions[0].Name = "a..b" },
+		"trailing dot":   func(m *modules.Manifest) { m.Functions[0].Name = "a." },
+		"leading dot":    func(m *modules.Manifest) { m.Functions[0].Name = ".a" },
+		"hyphen segment": func(m *modules.Manifest) { m.Functions[0].Name = "a.b-c" },
+		"space segment":  func(m *modules.Manifest) { m.Functions[0].Name = "a b" },
+		"digit segment":  func(m *modules.Manifest) { m.Functions[0].Name = "1a" },
+		"keyword segment": func(m *modules.Manifest) {
+			m.Functions[0].Name = "a.end"
+		},
+		"prefix collision": func(m *modules.Manifest) {
+			m.Functions[0].Name = "circle"
+			m.Functions = append(m.Functions, modules.Function{
+				Name:    "circle.area",
+				Params:  []modules.Param{{Name: "radius", Type: "number"}},
+				Returns: []modules.Return{{Name: "area", Type: "number"}},
+			})
+		},
 	}
 
 	for name, mutate := range cases {

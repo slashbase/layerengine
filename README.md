@@ -196,6 +196,8 @@ Because a module name is a global, it has to be free in the sandbox, so `LoadMod
 
 The [`external-modules`](examples/external-modules) example is a complete worked version: two modules over two live APIs, wired through three layers.
 
+The [`shapes`](examples/shapes) example is the smallest one that shows grouping: a single module whose manifest names are paths, so one module answers `shapes.circle.area(radius)` and `shapes.rect.area(width, height)`. It also prints the rendered prompt, so you can see the four lines the model is given without spending a token on generation.
+
 Keep a module's surface tight. It should own its endpoint and take only the arguments the layer supplies, so generated code can never reach a host you didn't choose — that is the difference between exposing a capability and exposing the network.
 
 ## Execution model & safety
@@ -219,8 +221,9 @@ What is still not covered: there is no hard memory cap. A watchdog samples the p
 | `manual-run`       | engine loads the flows manually without LoadSpec method   |
 | `external-modules` | two custom modules calling live HTTP APIs across three layers |
 | `typed-inputs`     | input coercion: lenient conversion, Strict rejection, undeclared arguments |
+| `shapes`           | one module publishing several groups: `shapes.circle.area(...)` and `shapes.rect.area(...)` |
 
-Each example lives under `examples/<name>/`. Most are a `flow.yaml` and a `main.go`; `external-modules` also carries the module implementations it registers.
+Each example lives under `examples/<name>/`. Most are a `flow.yaml` and a `main.go`; `external-modules` and `shapes` also carry the module implementations they register.
 
 ## Contributing
 

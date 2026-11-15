@@ -1,0 +1,45 @@
+name: shapes_report
+description: works out the area and perimeter of a circle and a rectangle, then says which one is bigger.
+input:
+  - radius:
+      type: number
+      description: radius of the circle
+  - width:
+      type: number
+      description: width of the rectangle
+  - height:
+      type: number
+      description: height of the rectangle
+layers:
+  - name: circle_stats
+    description: calls shapes.circle.area(radius) and shapes.circle.perimeter(radius) and returns both numbers
+    input:
+      - radius
+    output:
+      - circle_area:
+          type: number
+          description: area of the circle
+      - circle_perimeter:
+          type: number
+          description: perimeter of the circle
+  - name: rect_stats
+    description: calls shapes.rect.area(width, height) and shapes.rect.perimeter(width, height) and returns both numbers
+    input:
+      - width
+      - height
+    output:
+      - rect_area:
+          type: number
+          description: area of the rectangle
+      - rect_perimeter:
+          type: number
+          description: perimeter of the rectangle
+  - name: compare
+    description: returns the string "circle" if circle_area is greater than rect_area, otherwise the string "rect"
+    input:
+      - circle_area
+      - rect_area
+    output:
+      - larger:
+          type: string
+          description: the shape with the larger area

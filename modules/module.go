@@ -45,7 +45,7 @@ func Validate(mods []Module) error {
 		}
 		seen[name] = true
 
-		if !isLuaIdentifier(name) || luaKeywords[name] {
+		if !manifest.IsLuaIdentifier(name) || manifest.IsLuaKeyword(name) {
 			return fmt.Errorf("module %q: a module name must be a Lua identifier that is not a reserved word", name)
 		}
 
@@ -77,35 +77,3 @@ type (
 )
 
 const APIVersion = manifest.APIVersion
-
-// isLuaIdentifier reports whether s matches [A-Za-z_][A-Za-z0-9_]*.
-func isLuaIdentifier(s string) bool {
-	if s == "" {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c == '_':
-			// allowed anywhere in the segment
-		case c >= '0' && c <= '9':
-			if i == 0 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-// luaKeywords are the Lua 5.1 reserved words: they match the identifier pattern
-// but cannot be used as a name, and a module name is now a global in generated
-// code, so <module>.x(...) would not parse.
-var luaKeywords = map[string]bool{
-	"and": true, "break": true, "do": true, "else": true, "elseif": true,
-	"end": true, "false": true, "for": true, "function": true, "if": true,
-	"in": true, "local": true, "nil": true, "not": true, "or": true,
-	"repeat": true, "return": true, "then": true, "true": true, "until": true,
-	"while": true,
-}

@@ -60,6 +60,9 @@ func renderModuleUsage(m modules.Module) []string {
 
 	fns := make([]modules.Function, len(man.Functions))
 	copy(fns, man.Functions)
+	// Sorting by the full name keeps one group's operations adjacent: "." sorts
+	// below every character an identifier can contain, so a dotted name orders
+	// the way its segments do.
 	sort.SliceStable(fns, func(i, j int) bool { return fns[i].Name < fns[j].Name })
 
 	lines := make([]string, 0, len(fns)+1)

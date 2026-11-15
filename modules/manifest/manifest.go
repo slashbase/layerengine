@@ -17,7 +17,8 @@ import (
 const APIVersion = 1
 
 // Manifest is a module's declared surface: every function it publishes on the
-// layer table, with argument and return shapes.
+// module's table, with argument and return shapes. A function's name may be a
+// dotted path, so one module can publish several groups; see Function.
 //
 // Arguments are always positional: fn(a, b), one Lua argument per declared
 // parameter. Other calling conventions (a single table argument, say) are not
@@ -33,6 +34,13 @@ type Manifest struct {
 }
 
 // Function is one callable on the module table.
+//
+// Name is a dotted path into the tables the module's Init returns. "version"
+// names a function on the module table itself; "circle.area" names a function
+// in the "circle" sub-table that Init created. Every segment but the last names
+// a table, the last names a function, and each segment must be a valid Lua
+// identifier. The module name is the first segment at the call site, so a name
+// is always relative to the module table.
 type Function struct {
 	Name    string
 	Doc     string
@@ -88,8 +96,8 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("duplicate function %q", fn.Name)
 		}
 		seen[fn.Name] = true
-		if strings.HasPrefix(fn.Name, "layer.") {
-			return fmt.Errorf("function %q must be a bare name; the module name is bound as its own global", fn.Name)
+		if err := validateFunctionName(fn.Name); err != nil {
+			return err
 		}
 		for j, p := range fn.Params {
 			if p.Name == "" {
@@ -103,5 +111,38 @@ func (m Manifest) Validate() error {
 		}
 	}
 
+	return validateNoPathConflict(m.Functions)
+}
+
+// validateFunctionName checks one declared name. A name is a dotted path into
+// the tables the module's Init returns, so every segment has to be a valid Lua
+// identifier for the rendered call line to stay parseable.
+func validateFunctionName(name string) error {
+	for segment := range strings.SplitSeq(name, ".") {
+		if segment == "" {
+			return fmt.Errorf("function %q: empty path segment; a dotted name needs a segment on both sides of every dot", name)
+		}
+		if !IsLuaIdentifier(segment) {
+			return fmt.Errorf("function %q: path segment %q is not a valid Lua identifier (letters, digits and underscores, not starting with a digit)", name, segment)
+		}
+		if IsLuaKeyword(segment) {
+			return fmt.Errorf("function %q: path segment %q is a Lua reserved word", name, segment)
+		}
+	}
+	return nil
+}
+
+// validateNoPathConflict rejects a declared name that is a strict prefix of
+// another, at a dot boundary: "circle" alongside "circle.area" would need one
+// table slot to be both a function and the table holding area.
+func validateNoPathConflict(functions []Function) error {
+	for _, fn := range functions {
+		prefix := fn.Name + "."
+		for _, other := range functions {
+			if strings.HasPrefix(other.Name, prefix) {
+				return fmt.Errorf("function %q is a prefix of %q: one table slot cannot be both a function and the table holding %q", fn.Name, other.Name, other.Name)
+			}
+		}
+	}
 	return nil
 }
