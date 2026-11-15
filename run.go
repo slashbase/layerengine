@@ -114,7 +114,7 @@ func checkModuleNamesAreFree(mods []modules.Module) error {
 	defer runner.Close()
 
 	for _, mod := range mods {
-		if name := mod.Name(); runner.HasGlobalTable(name) {
+		if name := mod.Name(); runner.HasGlobal(name) {
 			return fmt.Errorf(
 				"module %q: the name is already a global in the layer sandbox (standard library or a removed loader); rename the module",
 				name,

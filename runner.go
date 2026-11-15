@@ -66,9 +66,8 @@ func (cr *LayerRunner) HasGlobalFunction(name string) bool {
 	return ok
 }
 
-func (cr *LayerRunner) HasGlobalTable(name string) bool {
-	_, ok := cr.luaRunner.GetGlobal(name).(*lua.LTable)
-	return ok
+func (cr *LayerRunner) HasGlobal(name string) bool {
+	return cr.luaRunner.GetGlobal(name) != lua.LNil
 }
 
 func (cr *LayerRunner) RunFunction(funName string, arguments []lua.LValue, outputLen int) error {
