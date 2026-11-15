@@ -95,9 +95,15 @@ func checkLayerDefinesFunction(layer *Layer, mods []modules.Module) error {
 // sandbox with no modules in it.
 //
 // A module name is a global, so a module called "string" would replace the
-// standard library's string table for every layer, and one called "load" would
-// put back a loader the sandbox removed — while the prompt still says it is
-// unavailable.
+// standard library's string table for every layer, and one called "print" would
+// replace a base-library function the prompt says is available. Both are bound
+// globals, so both are caught here: the question is whether the slot is free,
+// not what shape occupies it.
+//
+// What this does not cover: the loaders the sandbox removed are nil'd rather
+// than bound, so they read as free names. A module may take one, which binds a
+// table there and restores no capability — but the prompt still lists the name
+// as unavailable, so do not read this check as enforcing that list.
 //
 // The reserved set is derived from a real sandbox rather than listed here, so
 // opening another library later cannot leave this check behind. No timeout and

@@ -41,18 +41,25 @@ func (le *LayerEngine) init() {
 	le.flowInputs = map[string][]FlowInput{}
 }
 
-// LoadModules adds modules to the engine, after checking that their names are
-// free in the layer sandbox: a module name is a global, so it cannot shadow the
-// standard library or a loader the sandbox removed. A rejected set leaves the
-// engine unchanged.
+// LoadModules adds modules to the engine, after holding the set to what it
+// claims. Two checks, in this order:
 //
-// This is where the check belongs because it is where the module set becomes
-// final: a module accepted here is trusted by every layer that runs afterwards.
+//   - modules.Validate, which needs no sandbox: names are identifiers, not
+//     reserved words, not duplicated, and every non-zero manifest is sound.
+//   - checkModuleNamesAreFree, which needs one: a module name is a global, so
+//     it cannot shadow the standard library or a loader the sandbox removed.
+//
+// A rejected set leaves the engine unchanged. This is where the checks belong
+// because it is where the module set becomes final: a module accepted here is
+// trusted by every layer that runs afterwards.
 func (le *LayerEngine) LoadModules(mods []modules.Module) error {
 	le.mu.Lock()
 	defer le.mu.Unlock()
 
 	combined := append(append([]modules.Module(nil), le.mods...), mods...)
+	if err := modules.Validate(combined); err != nil {
+		return err
+	}
 	if err := checkModuleNamesAreFree(combined); err != nil {
 		return err
 	}
