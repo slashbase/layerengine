@@ -89,7 +89,7 @@ func (m Manifest) Validate() error {
 		}
 		seen[fn.Name] = true
 		if strings.HasPrefix(fn.Name, "layer.") {
-			return fmt.Errorf("function %q must be a bare name; the module name supplies the layer.<module> prefix", fn.Name)
+			return fmt.Errorf("function %q must be a bare name; the module name is bound as its own global", fn.Name)
 		}
 		for j, p := range fn.Params {
 			if p.Name == "" {

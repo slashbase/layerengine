@@ -26,7 +26,7 @@ type IPInfo struct{}
 func (IPInfo) Name() string { return "ipinfo" }
 
 func (IPInfo) Usage() string {
-	return `info = layer.ipinfo.get()
+	return `info = ipinfo.get()
 -- Looks up the caller's location by IP. Returns a table with:
 --   location  (string)  e.g. "Berlin, DE"
 --   latitude  (number)
@@ -126,7 +126,7 @@ type Weather struct{}
 func (Weather) Name() string { return "weather" }
 
 func (Weather) Usage() string {
-	return `w = layer.weather.current(latitude, longitude)
+	return `w = weather.current(latitude, longitude)
 -- Fetches the current weather for a coordinate. Returns a table with:
 --   temperature (number)  degrees Celsius
 --   wind_speed  (number)  km/h

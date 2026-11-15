@@ -15,7 +15,7 @@ type demoModule struct{}
 func (demoModule) Name() string { return "demo" }
 
 func (demoModule) Usage() string {
-	return "x = layer.demo.get(\"k\")\n-- free text notes are superseded by the manifest."
+	return "x = demo.get(\"k\")\n-- free text notes are superseded by the manifest."
 }
 
 func (demoModule) Init(l *lua.LState) *lua.LTable {
@@ -46,12 +46,12 @@ func (demoModule) Manifest() modules.Manifest {
 }
 
 // legacyModule declares nothing: it must render from Usage() alone, under a
-// layer.<name> heading.
+// <name> heading.
 type legacyModule struct{}
 
 func (legacyModule) Name() string { return "legacy" }
 
-func (legacyModule) Usage() string { return "v = layer.legacy.ping()" }
+func (legacyModule) Usage() string { return "v = legacy.ping()" }
 
 func (legacyModule) Init(l *lua.LState) *lua.LTable { return l.NewTable() }
 
@@ -64,7 +64,7 @@ type brokenModule struct{}
 
 func (brokenModule) Name() string { return "broken" }
 
-func (brokenModule) Usage() string { return "v = layer.broken.ping()" }
+func (brokenModule) Usage() string { return "v = broken.ping()" }
 
 func (brokenModule) Init(l *lua.LState) *lua.LTable { return l.NewTable() }
 
@@ -78,9 +78,9 @@ func TestGetModuleUsagePromptRendersManifest(t *testing.T) {
 	got := GetModuleUsagePrompt([]modules.Module{demoModule{}})
 
 	for _, want := range []string{
-		"value:table{city:string} = layer.demo.get(key:string) - Read a value.",
-		"ok:boolean = layer.demo.set(key:string, value?:any) - Store a value.",
-		"layer.demo - values are cached for 60s",
+		"value:table{city:string} = demo.get(key:string) - Read a value.",
+		"ok:boolean = demo.set(key:string, value?:any) - Store a value.",
+		"demo - values are cached for 60s",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("prompt is missing %q\ngot:\n%s", want, got)
@@ -88,14 +88,14 @@ func TestGetModuleUsagePromptRendersManifest(t *testing.T) {
 	}
 
 	// The manifest supersedes Usage(): no notes block, no separate signature block.
-	for _, unwanted := range []string{"usage notes:", "  get(key:string)", "  -- x = layer.demo.get"} {
+	for _, unwanted := range []string{"usage notes:", "  get(key:string)", "  -- x = demo.get"} {
 		if strings.Contains(got, unwanted) {
 			t.Errorf("prompt should not contain %q\ngot:\n%s", unwanted, got)
 		}
 	}
 
 	// Functions render in name order, not author order.
-	if strings.Index(got, "layer.demo.get(") > strings.Index(got, "layer.demo.set(") {
+	if strings.Index(got, "demo.get(") > strings.Index(got, "demo.set(") {
 		t.Errorf("functions are not sorted by name:\n%s", got)
 	}
 }
@@ -103,7 +103,7 @@ func TestGetModuleUsagePromptRendersManifest(t *testing.T) {
 func TestGetModuleUsagePromptFallsBackToUsage(t *testing.T) {
 	got := GetModuleUsagePrompt([]modules.Module{legacyModule{}})
 
-	for _, want := range []string{"layer.legacy", "  -- v = layer.legacy.ping()"} {
+	for _, want := range []string{"legacy\n  -- v = legacy.ping()"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("prompt is missing %q\ngot:\n%s", want, got)
 		}
@@ -113,10 +113,10 @@ func TestGetModuleUsagePromptFallsBackToUsage(t *testing.T) {
 func TestGetModuleUsagePromptIgnoresInvalidManifest(t *testing.T) {
 	got := GetModuleUsagePrompt([]modules.Module{brokenModule{}})
 
-	if !strings.Contains(got, "  -- v = layer.broken.ping()") {
+	if !strings.Contains(got, "  -- v = broken.ping()") {
 		t.Errorf("invalid manifest should fall back to Usage():\n%s", got)
 	}
-	if strings.Contains(got, "layer.broken.ping() - ") {
+	if strings.Contains(got, "broken.ping() - ") {
 		t.Errorf("invalid manifest should not render a call line:\n%s", got)
 	}
 }
@@ -128,7 +128,7 @@ func TestGetModuleUsagePromptIsDeterministic(t *testing.T) {
 	if forward != reverse {
 		t.Errorf("prompt depends on module order\nforward:\n%s\nreverse:\n%s", forward, reverse)
 	}
-	if strings.Index(forward, "layer.demo.get(") > strings.Index(forward, "layer.legacy") {
+	if strings.Index(forward, "demo.get(") > strings.Index(forward, "\nlegacy") {
 		t.Errorf("modules are not sorted by name:\n%s", forward)
 	}
 }
@@ -158,7 +158,7 @@ func (defaultsModule) Manifest() modules.Manifest {
 func TestGetModuleUsagePromptRendersDefault(t *testing.T) {
 	got := GetModuleUsagePrompt([]modules.Module{defaultsModule{}})
 
-	want := "items:table = layer.defaults.list(limit?:number=10) - List items."
+	want := "items:table = defaults.list(limit?:number=10) - List items."
 	if !strings.Contains(got, want) {
 		t.Fatalf("prompt is missing %q\ngot:\n%s", want, got)
 	}

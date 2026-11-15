@@ -91,6 +91,40 @@ func checkLayerDefinesFunction(layer *Layer, mods []modules.Module) error {
 	return nil
 }
 
+// checkModuleNamesAreFree rejects a module whose name is already bound in a
+// sandbox with no modules in it.
+//
+// A module name is a global, so a module called "string" would replace the
+// standard library's string table for every layer, and one called "load" would
+// put back a loader the sandbox removed — while the prompt still says it is
+// unavailable.
+//
+// The reserved set is derived from a real sandbox rather than listed here, so
+// opening another library later cannot leave this check behind. No timeout and
+// no memory guard: no layer code runs in this state.
+func checkModuleNamesAreFree(mods []modules.Module) error {
+	if len(mods) == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runner := NewLayerRunner(ctx, nil)
+	defer runner.Close()
+
+	for _, mod := range mods {
+		if name := mod.Name(); runner.HasGlobalTable(name) {
+			return fmt.Errorf(
+				"module %q: the name is already a global in the layer sandbox (standard library or a removed loader); rename the module",
+				name,
+			)
+		}
+	}
+
+	return nil
+}
+
 func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module) (any, error) {
 	var result []any
 	for _, layer := range layers {

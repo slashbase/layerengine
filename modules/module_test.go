@@ -83,3 +83,42 @@ func TestModulesValidateAcceptsBuiltin(t *testing.T) {
 		t.Fatalf("built-in modules rejected: %v", err)
 	}
 }
+
+// namedModule is a Module with a fixed name and no manifest, for checking the
+// rules a module name has to satisfy now that it is a global.
+type namedModule string
+
+func (n namedModule) Name() string { return string(n) }
+
+func (namedModule) Usage() string { return "" }
+
+func (namedModule) Init(l *lua.LState) *lua.LTable { return l.NewTable() }
+
+func (namedModule) Manifest() modules.Manifest { return modules.Manifest{} }
+
+// TestModulesValidateRejectsUnusableNames covers the names a module cannot
+// have: not an identifier, or a reserved word. A name that merely collides with
+// the standard library is caught later, against a live sandbox, not here.
+func TestModulesValidateRejectsUnusableNames(t *testing.T) {
+	for name, moduleName := range map[string]string{
+		"hyphen":        "my-http",
+		"dot":           "http.github",
+		"space":         "my http",
+		"digit-leading": "1http",
+		"reserved word": "end",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := modules.Validate([]modules.Module{namedModule(moduleName)}); err == nil {
+				t.Fatalf("expected module name %q to be rejected", moduleName)
+			}
+		})
+	}
+}
+
+func TestModulesValidateAcceptsUsableNames(t *testing.T) {
+	for _, name := range []string{"http", "system", "_internal", "db2", "layer"} {
+		if err := modules.Validate([]modules.Module{namedModule(name)}); err != nil {
+			t.Fatalf("module name %q rejected: %v", name, err)
+		}
+	}
+}

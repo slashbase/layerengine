@@ -41,10 +41,23 @@ func (le *LayerEngine) init() {
 	le.flowInputs = map[string][]FlowInput{}
 }
 
-func (le *LayerEngine) LoadModules(mods []modules.Module) {
+// LoadModules adds modules to the engine, after checking that their names are
+// free in the layer sandbox: a module name is a global, so it cannot shadow the
+// standard library or a loader the sandbox removed. A rejected set leaves the
+// engine unchanged.
+//
+// This is where the check belongs because it is where the module set becomes
+// final: a module accepted here is trusted by every layer that runs afterwards.
+func (le *LayerEngine) LoadModules(mods []modules.Module) error {
 	le.mu.Lock()
 	defer le.mu.Unlock()
-	le.mods = append(le.mods, mods...)
+
+	combined := append(append([]modules.Module(nil), le.mods...), mods...)
+	if err := checkModuleNamesAreFree(combined); err != nil {
+		return err
+	}
+	le.mods = combined
+	return nil
 }
 
 func (le *LayerEngine) GenerateLayers(flow *Flow) error {

@@ -3,7 +3,7 @@ description: Looks up the caller's location by IP, fetches the current weather f
 input: []
 layers:
   - name: get_location
-    description: Calls layer.ipinfo.get() and returns the caller's location name and its coordinates.
+    description: Calls ipinfo.get() and returns the caller's location name and its coordinates.
     input: []
     output:
       - location:
@@ -16,7 +16,7 @@ layers:
           type: number
           description: longitude of the location
   - name: get_weather
-    description: Calls layer.weather.current(latitude, longitude) and returns the current temperature and wind speed.
+    description: Calls weather.current(latitude, longitude) and returns the current temperature and wind speed.
     input:
       - latitude
       - longitude

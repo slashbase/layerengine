@@ -18,7 +18,7 @@ func (System) Name() string {
 }
 
 func (System) Usage() string {
-	return "versionString = layer.system.version() - get system version"
+	return "versionString = system.version() - get system version"
 }
 
 // Manifest declares the module's surface as data. codegen renders the signature

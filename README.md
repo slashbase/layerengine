@@ -141,13 +141,13 @@ func main() {
 
 ## Modules
 
-A layer's Lua starts with pure computation only — the standard library is deliberately narrow (see [Execution model & safety](#execution-model--safety)). Real work happens through a **module**: a small Go type that publishes functions on the `layer` table and describes itself so the LLM knows how to call it.
+A layer's Lua starts with pure computation only — the standard library is deliberately narrow (see [Execution model & safety](#execution-model--safety)). Real work happens through a **module**: a small Go type that publishes a table of functions and describes itself so the LLM knows how to call it.
 
 A module implements four methods:
 
 ```go
 type Module interface {
-	Name() string                    // key on the layer table: "weather" → layer.weather
+	Name() string                    // the global it is bound to: "modname" → modname.<fn>(...)
 	Init(l *lua.LState) *lua.LTable  // the functions to expose
 	Usage() string                   // free-text; used by codegen as notes; rendered only when Manifest is zero
 	Manifest() modules.Manifest      // used by codegen; the functions it exposes, as data
@@ -174,21 +174,25 @@ func (Weather) Manifest() modules.Manifest {
 With a manifest, each function renders as a single call-shaped line, the way a module author would write it by hand — return names on the left, types inline, the doc after a dash:
 
 ```
-celsius:number = layer.weather.temperature(city:string) - Temperature in degrees Celsius for a city.
+celsius:number = weather.temperature(city:string) - Temperature in degrees Celsius for a city.
 ```
 
 An argument with a `Default` renders as `limit?:number=10` and may be omitted by the generated code, whether or not `Optional` is set.
 
-`Notes` renders once per module in the same shape: `layer.weather - fetches live weather from live weather API.` A module's `Usage()` is only rendered when it declares nothing — the zero `modules.Manifest{}` — and then it appears under a `layer.<name>` heading. Modules and functions are sorted, so the same module set always produces the same prompt. `modules.Validate(mods)` reports duplicate module names and malformed manifests.
+`Notes` renders once per module in the same shape: `weather - fetches live weather from live weather API.` A module's `Usage()` is only rendered when it declares nothing — the zero `modules.Manifest{}` — and then it appears under a `<name>` heading. Modules and functions are sorted, so the same module set always produces the same prompt. `modules.Validate(mods)` reports duplicate or unusable module names and malformed manifests.
 
 Register modules on the engine before loading a flow:
 
 ```go
 engine := layerengine.NewLayerEngine(generator)
-engine.LoadModules([]modules.Module{Module1{}, Module2{}})
+if err := engine.LoadModules([]modules.Module{Module1{}, Module2{}}); err != nil {
+	log.Fatal(err)
+}
 ```
 
-Two things happen. The modules are installed on every layer's `layer` table, and each module's surface is rendered into the prompt sent to the LLM — so the generated code knows the calls exist, their arity, and what they return. `LoadModules` adds new modules to the engine alongside the built-in `system` module.
+Two things happen. Each module table is bound as a **global named after the module** in every layer's sandbox — so `modname` is `modname.fnname(...)`, and each module's surface is rendered into the prompt sent to the LLM, so the generated code knows the calls exist, their arity, and what they return. `LoadModules` adds new modules to the engine alongside the built-in `system` module.
+
+Because a module name is a global, it has to be free in the sandbox, so `LoadModules` checks it and can fail: a module called `string` would replace the standard library's string table, and one called `load` would put back a loader the sandbox removed — both rejected with the name in the error, and a rejected set leaves the engine unchanged. The reserved set is read off a real sandbox rather than hardcoded, so opening another library later cannot leave the check behind.
 
 The [`external-modules`](examples/external-modules) example is a complete worked version: two modules over two live APIs, wired through three layers.
 
@@ -201,7 +205,7 @@ Keep a module's surface tight. It should own its endpoint and take only the argu
 - **Codegen timeout.** LLM requests use a 60s timeout.
 - **Concurrency safety.** The engine guards its layer/flow registries with an `RWMutex`; `RunFlow` takes defensive copies of the layer slice so a concurrent `LoadSpec` can't mutate a running flow's view.
 
-**What the layer sandbox covers, and what it doesn't.** Each layer runs with only base, string, table, math and the layer.* module table. os, io, debug and package are not opened, and the dynamic loaders (load, loadstring, dofile, getfenv, setfenv, collectgarbage) are removed. Generated code therefore cannot read files, spawn processes, read the environment, or exit the process — host capability is reachable only through a module you expose deliberately on the layer table.
+**What the layer sandbox covers, and what it doesn't.** Each layer runs with only base, string, table, math and the module tables you register. os, io, debug and package are not opened, and the dynamic loaders (load, loadstring, dofile, getfenv, setfenv, collectgarbage) are removed. Generated code therefore cannot read files, spawn processes, read the environment, or exit the process — host capability is reachable only through a module you expose deliberately as a global in the sandbox.
 
 What is still not covered: there is no hard memory cap. A watchdog samples the process heap every 50 ms and cancels a layer that grows past ~256 MiB, but it is approximate and process-wide, and it is only meaningful for sequential execution — a single very large allocation can overshoot before the poller observes it. True isolation (a kernel-enforced address-space limit) would mean running layers in a child process, which the engine does not do yet. That, together with the experimental status, is why this is still not for production use.
 

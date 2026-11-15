@@ -23,10 +23,13 @@ func main() {
 	}
 	engine := layerengine.NewLayerEngine(codegenerater)
 
-	// Register this example's modules. They become layer.ipinfo and
-	// layer.weather, and their Usage() is rendered into the codegen prompt,
-	// so the model knows the calls exist and what they return.
-	engine.LoadModules([]modules.Module{IPInfo{}, Weather{}})
+	// Register this example's modules. They become the ipinfo and weather
+	// globals in every layer, and their Usage() is rendered into the codegen
+	// prompt, so the model knows the calls exist and what they return.
+	if err := engine.LoadModules([]modules.Module{IPInfo{}, Weather{}}); err != nil {
+		fmt.Println("Error registering modules:", err)
+		return
+	}
 
 	data, err := os.ReadFile("./examples/external-modules/flow.yaml")
 	if err != nil {

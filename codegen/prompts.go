@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	modulesUsageInfo = `The only global table is 'layer'. It contains exactly the modules and functions listed below, with exactly the arguments shown. Calling anything not listed here, or reaching for any other global, is an error.
+	modulesUsageInfo = `Each module below is a global table of its own, holding exactly the functions listed for it, with exactly the arguments shown. Calling anything not listed here, or reaching for any other global, is an error.
 Use:`
 
 	environmentFacts = `This function runs in a restricted Lua 5.1 environment.
-Available: the base library, string, table, math, and the layer module table.
+Available: the base library, string, table, math, and the module tables listed below.
 Not available: os, io, debug, package, require, loadfile, module, dofile, load,
 loadstring, getfenv, setfenv, collectgarbage, newproxy, channel, coroutine.`
 )
@@ -27,10 +27,10 @@ const (
 // Each declared function renders as a single call-shaped line, the way a module
 // author would write it by hand:
 //
-//	versionString:string = layer.system.version() - get system version
+//	versionString:string = system.version() - get system version
 //
 // A module that returns the zero manifest — or one that does not validate — has
-// nothing declared, so it falls back to its Usage() text under a layer.<name>
+// nothing declared, so it falls back to its Usage() text under a <name>
 // heading. Modules and functions are sorted, so the same module set always
 // produces the same prompt.
 func GetModuleUsagePrompt(mods []modules.Module) string {
@@ -67,7 +67,7 @@ func renderModuleUsage(m modules.Module) []string {
 		lines = append(lines, renderCallLine(m.Name(), fn))
 	}
 	if notes := oneLine(man.Notes); notes != "" {
-		lines = append(lines, "layer."+m.Name()+" - "+notes)
+		lines = append(lines, m.Name()+" - "+notes)
 	}
 
 	return lines
@@ -75,10 +75,13 @@ func renderModuleUsage(m modules.Module) []string {
 
 // renderCallLine renders one function the way it is called:
 //
-//	<returns> = layer.<module>.<fn>(<params>) - <doc>
+//	<returns> = <module>.<fn>(<params>) - <doc>
 //
-// The assignment is omitted when no return is named. Param and return types are
-// inline annotations, so arity and shape survive in a single line.
+// The module name is the global the module table is bound to, and it is what
+// the call is made on: it is not optional, or the line names a function with no
+// table to find it in. The assignment is omitted when no return is named. Param
+// and return types are inline annotations, so arity and shape survive in a
+// single line.
 func renderCallLine(module string, fn modules.Function) string {
 	var b strings.Builder
 
@@ -87,7 +90,6 @@ func renderCallLine(module string, fn modules.Function) string {
 		b.WriteString(" = ")
 	}
 
-	b.WriteString("layer.")
 	b.WriteString(module)
 	b.WriteString(".")
 	b.WriteString(fn.Name)
@@ -159,10 +161,9 @@ func namedReturns(returns []modules.Return) string {
 }
 
 // renderUsageFallback renders a module that declares no surface: its Usage() text
-// under a layer.<name> heading, unchanged from the free-text days.
+// under a <name> heading, unchanged from the free-text days.
 func renderUsageFallback(m modules.Module) []string {
 	var b strings.Builder
-	b.WriteString("layer.")
 	b.WriteString(m.Name())
 	writeCommentBlock(&b, "  ", strings.TrimSpace(m.Usage()))
 	return strings.Split(b.String(), "\n")

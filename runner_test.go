@@ -63,8 +63,8 @@ end
 }
 
 // TestSandboxHidesHostCapabilities asserts the layer environment exposes none
-// of the host-capable globals. Generated code must go through layer.* for
-// anything beyond pure computation.
+// of the host-capable globals. Generated code must go through a module global
+// for anything beyond pure computation.
 func TestSandboxHidesHostCapabilities(t *testing.T) {
 	proto, err := ParseAndCompileLuaCode(`
 function probe()
