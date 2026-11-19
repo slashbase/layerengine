@@ -1,0 +1,53 @@
+name: test
+
+# Runs on every push to main, every pull request, and every version tag.
+#
+# Tags are covered because a tag is what people `go get`: the suite should run
+# against the exact commit a tag points at, even though nothing publishes from
+# it yet. A release workflow can call this one later by adding `workflow_call:`
+# to the `on:` block below.
+#
+# There is no secret in here on purpose: the codegen tests point the SDKs at
+# httptest servers through config.Config.BaseURL, so nothing reaches a provider.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # The floor is go.mod's `go` directive, so it is stated once.
+          go-version-file: go.mod
+          cache: true
+
+      # gofmt has no check mode, so compare the listing to empty.
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: build
+        run: go build ./...
+
+      # -race because the engine guards its registries with an RWMutex and the
+      # load path is the part that changes; -shuffle to catch tests that only
+      # pass in declaration order.
+      - name: test
+        run: go test -race -shuffle=on -count=1 ./...
