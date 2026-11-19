@@ -250,6 +250,7 @@ What is still not covered: there is no hard memory cap. A watchdog samples the p
 | `external-modules` | two custom modules calling live HTTP APIs across three layers |
 | `typed-inputs`     | input coercion: lenient conversion, Strict rejection, undeclared arguments |
 | `shapes`           | one module publishing several groups: `shapes.circle.area(...)` and `shapes.rect.area(...)` |
+| `sudoku-solve`     | a recursive backtracking solver described in prose, plus a layer that verifies the answer instead of trusting it |
 | `personal-expenses` | five layers over a monthly budget: parsing, cap checks, savings rate, and a verdict that moves with income |
 
 Each example lives under `examples/<name>/`. Most are a `flow.yaml` and a `main.go`; `external-modules` and `shapes` also carry the module implementations they register.

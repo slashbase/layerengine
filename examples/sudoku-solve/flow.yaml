@@ -1,0 +1,134 @@
+name: sudoku_solve
+description: Takes a 9x9 sudoku as text, parses it, rejects a puzzle that already breaks the rules, solves it by backtracking, verifies the answer against the rules and the original givens, and renders the board.
+input:
+  - puzzle:
+      type: string
+      description: the 9x9 grid as text, digits 1-9 for givens and '.' or '0' for blanks. Whitespace and newlines are ignored, so the grid may be written as nine rows.
+layers:
+  - name: parse_puzzle
+    description: |
+      Remove every whitespace character from the puzzle string with
+      string.gsub(puzzle, "%s", "") so that newlines in a nine-row grid do not
+      count as cells. Walk the cleaned string from position 1 to 81 with
+      string.sub, and build a cells array holding one number per position: a
+      digit '1' to '9' becomes its number, and every other character, including
+      '.', becomes 0. When the cleaned string is shorter than 81 characters,
+      treat every missing position as 0. Count the positions holding a non-zero
+      number as you go. Return the cells array first and that count second.
+    input:
+      - puzzle
+    output:
+      - cells:
+          type: array
+          description: 81 numbers, row by row, with 0 for a blank cell
+      - given_count:
+          type: integer
+          description: how many of the 81 cells were given as a digit
+
+  - name: check_puzzle
+    description: |
+      Check the given cells for rule violations before anything tries to solve
+      them. Treat cells as a flat array of 81 numbers where position i belongs to
+      row math.floor((i-1)/9)+1 and column (i-1)%9+1. For each of the 9 rows,
+      each of the 9 columns and each of the 9 3x3 boxes, walk its nine positions
+      and remember the non-zero values seen in a table; when a value repeats,
+      record one message for that unit in the form "row 3: 5", "column 7: 2" or
+      "box 5: 8". Record each message at most once, sort the messages
+      alphabetically, and return them as an array. Return true for the second
+      value when that array is empty, and false otherwise.
+    input:
+      - cells
+    output:
+      - conflicts:
+          type: array
+          description: alphabetically sorted messages naming each unit and digit that repeats, empty when the puzzle is legal
+      - puzzle_valid:
+          type: boolean
+          description: true when no row, column or box repeats a digit
+
+  - name: solve_puzzle
+    description: |
+      Solve by backtracking over a flat array of 81 numbers. When puzzle_valid is
+      false, return a copy of cells and false without searching at all. Otherwise
+      copy cells into a new work array of 81 numbers so the input array is never
+      modified, and note that position i belongs to row
+      math.floor((i-1)/9)+1 and column (i-1)%9+1. Define a local function legal(i,
+      v) that scans the row, the column and the 3x3 box containing position i and
+      returns false when v already appears in any of them. Define a local
+      recursive function search() declared as "local function search()" so it can
+      call itself: it scans positions 1 to 81 in ascending order for the first
+      position holding 0, returns true when no such position remains, and
+      otherwise tries every v from 1 to 9 in ascending order, and for each v that
+      legal() accepts sets work[i] = v, recurses, and on a false result resets
+      work[i] = 0 before trying the next v; it returns false when no digit fits.
+      Call search() exactly once and return the work array and its boolean. A
+      puzzle with several solutions therefore yields the first one found in
+      row-major, ascending-digit order. Do not use loadstring, load, require or
+      any other dynamic loader; a local function calling itself is all the
+      recursion needed.
+    input:
+      - cells
+      - puzzle_valid
+    output:
+      - solved_cells:
+          type: array
+          description: 81 numbers holding the solution, or a copy of the input cells when no solution was found
+      - solved:
+          type: boolean
+          description: true only when every cell holds a digit and the grid was solved
+
+  - name: verify_solution
+    description: |
+      Check the solver's answer independently, without assuming it was correct.
+      Start by returning false and "solver reported no solution" when solved is
+      not true, testing it as "if not solved then" so that a missing value fails
+      here instead of passing. Then check, in this order, and return false with the first message
+      that fails: every one of the 81 positions holds a whole number from 1 to 9,
+      reported as "cell 37 holds 0"; every row holds nine distinct values,
+      reported as "row 4 repeats a digit"; every column holds nine distinct
+      values, reported as "column 2 repeats a digit"; every 3x3 box holds nine
+      distinct values, reported as "box 5 repeats a digit", computing each
+      position with the same one-based formula used everywhere else, namely
+      (row - 1) * 9 + column, where row and column are counted from 1 inside the
+      box, rather than building the index from zero-based offsets; and every position
+      that was non-zero in the original cells array is unchanged, reported as
+      "given at cell 12 was changed". When all checks pass, return true and the
+      string "none".
+    input:
+      - solved_cells
+      - cells
+      - solved
+    output:
+      - verified:
+          type: boolean
+          description: true only when the answer satisfies every rule and preserves every given
+      - defect:
+          type: string
+          description: the first failure found, or "none" when the answer is correct
+
+  - name: render_board
+    description: |
+      Build the board as one multi-line string. Use the rule line
+      "+-------+-------+-------+" and lay out each row as "| d d d | d d d | d d d |"
+      with a single space between digits. The board carries exactly four rule
+      lines and no others: one before row 1, one after row 3, one after row 6 and
+      one after row 9. Emit each of those four in a single pass, so that the
+      boundary between row 3 and row 4 and the boundary between row 6 and row 7
+      each get one rule line and never two. Above the board print the line
+      "Givens: <given_count>". Below the board print
+      "Solved: <solved> | Verified: <verified>", then "Defects: <defect>", then
+      "Puzzle conflicts: <conflicts joined by ', '>" or "Puzzle conflicts: none"
+      when the conflicts array is empty. Convert the booleans with tostring so
+      they print as true or false. Join every line with a single newline
+      character and return the whole string as one value.
+    input:
+      - solved_cells
+      - given_count
+      - solved
+      - verified
+      - defect
+      - conflicts
+    output:
+      - board:
+          type: string
+          description: the rendered board with its summary lines
