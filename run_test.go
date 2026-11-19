@@ -77,3 +77,30 @@ loop:
 		t.Fatalf("wrong cancel cause: got %v, want %v", got, cause)
 	}
 }
+
+// TestCyclicTableOutputIsAnErrorNotACrash covers the generated-code path: a
+// layer can build a self-referencing table, and returning it has to fail the
+// layer rather than overflow the stack and take the process down.
+func TestCyclicTableOutputIsAnErrorNotACrash(t *testing.T) {
+	proto, err := ParseAndCompileLuaCode(`
+function loop()
+  local t = {}
+  t.self = t
+  return t
+end
+`)
+	if err != nil {
+		t.Fatalf("compile loop: %v", err)
+	}
+
+	layer := &Layer{
+		Name:    "loop",
+		Output:  []LayerOutput{{Name: "out", Type: "table"}},
+		FnProto: proto,
+	}
+
+	_, err = runLayer(layer, nil, []modules.Module{})
+	if err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Fatalf("runLayer error = %v, want a cycle error", err)
+	}
+}

@@ -85,3 +85,70 @@ func TestConvertLuaTableToGoHandlesDenseMixedAndSparseTables(t *testing.T) {
 		t.Errorf("sparse table = %#v, want map preserving key 3", sparseValue)
 	}
 }
+
+func TestConvertLuaValueToGoValueRejectsCyclicTable(t *testing.T) {
+	table := &lua.LTable{}
+	table.RawSetString("self", table)
+
+	_, err := ConvertLuaValueToGoValue(table)
+	if err == nil || !strings.Contains(err.Error(), "cycle") {
+		t.Fatalf("error = %v, want a cycle error", err)
+	}
+}
+
+func TestConvertLuaValueToGoValueRejectsOverlyDeepTable(t *testing.T) {
+	root := &lua.LTable{}
+	current := root
+	for range maxValueDepth + 5 {
+		next := &lua.LTable{}
+		current.RawSetInt(1, next)
+		current = next
+	}
+
+	_, err := ConvertLuaValueToGoValue(root)
+	if err == nil || !strings.Contains(err.Error(), "nested deeper") {
+		t.Fatalf("error = %v, want a depth error", err)
+	}
+}
+
+// A table reached twice by different branches is a DAG, not a cycle. The
+// conversion has to accept it, or shared structure in generated output would be
+// rejected as if it were malformed.
+func TestConvertLuaValueToGoValueAllowsTableSharedBySiblings(t *testing.T) {
+	shared := &lua.LTable{}
+	shared.RawSetString("name", lua.LString("shared"))
+
+	root := &lua.LTable{}
+	root.RawSetString("left", shared)
+	root.RawSetString("right", shared)
+
+	value, err := ConvertLuaValueToGoValue(root)
+	if err != nil {
+		t.Fatalf("converting a DAG: %v", err)
+	}
+
+	// The root's Go type depends on the key-shape policy, which this test is not
+	// about: it only has to show the shared table was not mistaken for a cycle.
+	var entries int
+	switch mapped := value.(type) {
+	case map[string]any:
+		entries = len(mapped)
+	case map[any]any:
+		entries = len(mapped)
+	default:
+		t.Fatalf("root converted to %T, want a map", value)
+	}
+	if entries != 2 {
+		t.Fatalf("root has %d entries, want 2", entries)
+	}
+}
+
+func TestConvertGoValueToLuaValueRejectsSelfReferentialMap(t *testing.T) {
+	cycle := map[string]any{}
+	cycle["self"] = cycle
+
+	_, err := ConvertGoValueToLuaValue(cycle)
+	if err == nil || !strings.Contains(err.Error(), "nested deeper") {
+		t.Fatalf("error = %v, want a depth error", err)
+	}
+}

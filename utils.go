@@ -1,6 +1,7 @@
 package layerengine
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -9,6 +10,16 @@ import (
 )
 
 const maxExactLuaInteger = uint64(1 << 53)
+
+// maxValueDepth bounds how far a value is walked when converting between Go and
+// Lua.
+//
+// A Lua table can reference itself, and the conversion below is Go recursion
+// that runs after the layer's context has been torn down: nothing can interrupt
+// it. Without a bound, a layer that returns a cyclic table overflows the
+// goroutine stack, which is a fatal error rather than a recoverable panic, and
+// takes the whole process down with it.
+const maxValueDepth = 100
 
 // ConvertGoValueToLuaValue converts a Go value into a Lua value. Unsupported
 // values return an error rather than crashing the caller.
@@ -19,10 +30,16 @@ func ConvertGoValueToLuaValue(input any) (lua.LValue, error) {
 	if value, ok := input.(lua.LValue); ok {
 		return value, nil
 	}
-	return convertGoValueToLuaValue(reflect.ValueOf(input))
+	return convertGoValueToLuaValue(reflect.ValueOf(input), 0)
 }
 
-func convertGoValueToLuaValue(value reflect.Value) (lua.LValue, error) {
+// convertGoValueToLuaValue walks a Go value into Lua. depth bounds the walk: a
+// Go map, slice or pointer can contain itself, so the recursion has to end in
+// an error rather than in a stack overflow.
+func convertGoValueToLuaValue(value reflect.Value, depth int) (lua.LValue, error) {
+	if depth > maxValueDepth {
+		return nil, fmt.Errorf("value nested deeper than %d levels", maxValueDepth)
+	}
 	for value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			return lua.LNil, nil
@@ -55,7 +72,7 @@ func convertGoValueToLuaValue(value reflect.Value) (lua.LValue, error) {
 		}
 		table := &lua.LTable{}
 		for i := 0; i < value.Len(); i++ {
-			item, err := convertGoValueToLuaValue(value.Index(i))
+			item, err := convertGoValueToLuaValue(value.Index(i), depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("convert array item %d: %w", i, err)
 			}
@@ -72,7 +89,7 @@ func convertGoValueToLuaValue(value reflect.Value) (lua.LValue, error) {
 		table := &lua.LTable{}
 		iter := value.MapRange()
 		for iter.Next() {
-			item, err := convertGoValueToLuaValue(iter.Value())
+			item, err := convertGoValueToLuaValue(iter.Value(), depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("convert map value for key %q: %w", iter.Key().String(), err)
 			}
@@ -85,7 +102,21 @@ func convertGoValueToLuaValue(value reflect.Value) (lua.LValue, error) {
 }
 
 // ConvertLuaValueToGoValue converts a Lua value to its Go representation.
+//
+// The conversion is bounded: a table that reaches itself, or nests deeper than
+// maxValueDepth, returns an error instead of recursing. This runs after the
+// layer's context is gone, so the bound is the only thing standing between
+// generated code and a process-wide crash.
 func ConvertLuaValueToGoValue(value lua.LValue) (any, error) {
+	return convertLuaValue(value, make(map[*lua.LTable]struct{}), 0)
+}
+
+// convertLuaValue is ConvertLuaValueToGoValue carrying the recursion state.
+//
+// seen holds the tables on the current path, so a table reached twice by
+// different branches — a DAG, which is legal and common — converts fine, while
+// a table that reaches itself is reported as a cycle.
+func convertLuaValue(value lua.LValue, seen map[*lua.LTable]struct{}, depth int) (any, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -100,7 +131,7 @@ func ConvertLuaValueToGoValue(value lua.LValue) (any, error) {
 	case lua.LTString:
 		return lua.LVAsString(value), nil
 	case lua.LTTable:
-		return convertLuaTableToGo(value.(*lua.LTable))
+		return convertLuaTableToGo(value.(*lua.LTable), seen, depth)
 	default:
 		return nil, fmt.Errorf("unsupported Lua value type %s", value.Type())
 	}
@@ -135,7 +166,18 @@ type luaTableEntry struct {
 	value lua.LValue
 }
 
-func convertLuaTableToGo(table *lua.LTable) (any, error) {
+func convertLuaTableToGo(table *lua.LTable, seen map[*lua.LTable]struct{}, depth int) (any, error) {
+	if depth > maxValueDepth {
+		return nil, fmt.Errorf("table nested deeper than %d levels", maxValueDepth)
+	}
+	if _, cycle := seen[table]; cycle {
+		return nil, errors.New("table contains a cycle and cannot be converted")
+	}
+	seen[table] = struct{}{}
+	// Deleting on the way out makes the check path-based: the same table reached
+	// by two sibling branches is a DAG, not a cycle, and must still convert.
+	defer delete(seen, table)
+
 	entries := make([]luaTableEntry, 0, table.Len())
 	table.ForEach(func(key, value lua.LValue) {
 		entries = append(entries, luaTableEntry{key: key, value: value})
@@ -145,7 +187,7 @@ func convertLuaTableToGo(table *lua.LTable) (any, error) {
 		array := make([]any, len(entries))
 		for _, entry := range entries {
 			index := int(lua.LVAsNumber(entry.key))
-			converted, err := ConvertLuaValueToGoValue(entry.value)
+			converted, err := convertLuaValue(entry.value, seen, depth+1)
 			if err != nil {
 				return nil, fmt.Errorf("convert array item %d: %w", index, err)
 			}
@@ -156,11 +198,11 @@ func convertLuaTableToGo(table *lua.LTable) (any, error) {
 
 	mapped := make(map[any]any, len(entries))
 	for _, entry := range entries {
-		key, err := ConvertLuaValueToGoValue(entry.key)
+		key, err := convertLuaValue(entry.key, seen, depth+1)
 		if err != nil {
 			return nil, fmt.Errorf("convert table key: %w", err)
 		}
-		value, err := ConvertLuaValueToGoValue(entry.value)
+		value, err := convertLuaValue(entry.value, seen, depth+1)
 		if err != nil {
 			return nil, fmt.Errorf("convert table value for key %v: %w", key, err)
 		}
