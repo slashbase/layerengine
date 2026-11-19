@@ -143,6 +143,46 @@ func TestConvertLuaValueToGoValueAllowsTableSharedBySiblings(t *testing.T) {
 	}
 }
 
+func TestConvertGoValueToLuaValueRejectsInexactInteger(t *testing.T) {
+	_, err := ConvertGoValueToLuaValue(int64(1<<53) + 1)
+	if err == nil || !strings.Contains(err.Error(), "cannot be represented exactly") {
+		t.Fatalf("error = %v, want an inexact-integer error", err)
+	}
+
+	if _, err := ConvertGoValueToLuaValue(int64(1 << 53)); err != nil {
+		t.Fatalf("2^53 must convert exactly, got error: %v", err)
+	}
+}
+
+func TestConvertLuaValueToGoValueReturnsStringKeyedMap(t *testing.T) {
+	table := &lua.LTable{}
+	table.RawSetString("city", lua.LString("Pune"))
+	table.RawSetString("count", lua.LNumber(2))
+
+	value, err := ConvertLuaValueToGoValue(table)
+	if err != nil {
+		t.Fatalf("convert string-keyed table: %v", err)
+	}
+	mapped, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("value type = %T, want map[string]any", value)
+	}
+	if mapped["city"] != "Pune" || mapped["count"] != lua.LNumber(2) {
+		t.Fatalf("value = %#v, want the table's entries", mapped)
+	}
+}
+
+func TestConvertLuaValueToGoValueReturnsEmptyMapForEmptyTable(t *testing.T) {
+	value, err := ConvertLuaValueToGoValue(&lua.LTable{})
+	if err != nil {
+		t.Fatalf("convert empty table: %v", err)
+	}
+	mapped, ok := value.(map[string]any)
+	if !ok || len(mapped) != 0 {
+		t.Fatalf("value = %#v, want an empty map[string]any", value)
+	}
+}
+
 func TestConvertGoValueToLuaValueRejectsSelfReferentialMap(t *testing.T) {
 	cycle := map[string]any{}
 	cycle["self"] = cycle

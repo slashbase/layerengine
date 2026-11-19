@@ -9,7 +9,10 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-const maxExactLuaInteger = uint64(1 << 53)
+// maxExactLuaInteger is 2^53, the largest integer a float64 — and therefore a
+// Lua number — represents exactly. Values past it are rejected rather than
+// silently rounded, in the signed case as well as the unsigned one.
+const maxExactLuaInteger = 1 << 53
 
 // maxValueDepth bounds how far a value is walked when converting between Go and
 // Lua.
@@ -53,7 +56,11 @@ func convertGoValueToLuaValue(value reflect.Value, depth int) (lua.LValue, error
 	case reflect.String:
 		return lua.LString(value.String()), nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return lua.LNumber(value.Int()), nil
+		integer := value.Int()
+		if integer > maxExactLuaInteger || integer < -maxExactLuaInteger {
+			return nil, fmt.Errorf("integer %d cannot be represented exactly as a Lua number", integer)
+		}
+		return lua.LNumber(integer), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		integer := value.Uint()
 		if integer > maxExactLuaInteger {
@@ -196,6 +203,25 @@ func convertLuaTableToGo(table *lua.LTable, seen map[*lua.LTable]struct{}, depth
 		return array, nil
 	}
 
+	// A table whose keys are all strings is a record, and converts to
+	// map[string]any: it round-trips back through ConvertGoValueToLuaValue, which
+	// accepts only string-keyed maps, and it marshals as JSON. Numeric or mixed
+	// keys keep map[any]any so no key is lost. An empty table lands here and
+	// becomes an empty map[string]any — an empty table cannot be told apart from
+	// an empty array, so that choice is arbitrary but stable.
+	if allStringKeys(entries) {
+		mapped := make(map[string]any, len(entries))
+		for _, entry := range entries {
+			key := lua.LVAsString(entry.key)
+			value, err := convertLuaValue(entry.value, seen, depth+1)
+			if err != nil {
+				return nil, fmt.Errorf("convert table value for key %q: %w", key, err)
+			}
+			mapped[key] = value
+		}
+		return mapped, nil
+	}
+
 	mapped := make(map[any]any, len(entries))
 	for _, entry := range entries {
 		key, err := convertLuaValue(entry.key, seen, depth+1)
@@ -229,4 +255,16 @@ func isDenseLuaArray(entries []luaTableEntry) bool {
 	}
 
 	return len(indexes) == len(entries)
+}
+
+// allStringKeys reports whether every key in entries is a Lua string. The empty
+// case is vacuously true, which is what makes an empty table a map rather than
+// an array.
+func allStringKeys(entries []luaTableEntry) bool {
+	for _, entry := range entries {
+		if entry.key.Type() != lua.LTString {
+			return false
+		}
+	}
+	return true
 }

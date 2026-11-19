@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
+	"runtime/metrics"
 	"time"
 
 	"github.com/slashbase/layerengine/modules"
@@ -207,9 +207,21 @@ func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module)
 	return result, nil
 }
 
+// heapObjectsMetric is live heap object bytes: the quantity runtime.ReadMemStats
+// reports as HeapAlloc.
+const heapObjectsMetric = "/memory/classes/heap/objects:bytes"
+
+// guardMemory cancels the layer when the process heap grows past limit.
+//
+// The sample comes from runtime/metrics rather than runtime.ReadMemStats. This
+// runs once per layer every 50ms and ReadMemStats stops the world on every
+// call, so N concurrent flows meant 20N pauses a second. The sample slice is
+// per-call, not package-level, because metrics.Read writes into it.
 func guardMemory(ctx context.Context, cancel context.CancelCauseFunc, limit uint64, cause error) {
-	var base runtime.MemStats
-	runtime.ReadMemStats(&base)
+	samples := []metrics.Sample{{Name: heapObjectsMetric}}
+	metrics.Read(samples)
+	base := samples[0].Value.Uint64()
+
 	t := time.NewTicker(50 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -217,9 +229,9 @@ func guardMemory(ctx context.Context, cancel context.CancelCauseFunc, limit uint
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			var s runtime.MemStats
-			runtime.ReadMemStats(&s)
-			if s.HeapAlloc > base.HeapAlloc && s.HeapAlloc-base.HeapAlloc > limit {
+			metrics.Read(samples)
+			current := samples[0].Value.Uint64()
+			if current > base && current-base > limit {
 				cancel(cause)
 				return
 			}
