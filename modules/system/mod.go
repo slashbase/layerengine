@@ -37,6 +37,6 @@ func (System) Manifest() manifest.Manifest {
 }
 
 func (System) printV(l *lua.LState) int {
-	l.Push(lua.LString("v0.4.0"))
+	l.Push(lua.LString("v0.5.0"))
 	return 1
 }
