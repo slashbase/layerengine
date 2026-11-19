@@ -214,12 +214,17 @@ func (groupsModule) Manifest() modules.Manifest {
 func noop(*lua.LState) int { return 0 }
 
 // callLines returns the call lines rendered for module, in prompt order.
+//
+// A call line is "<returns> = <module>.<fn>(<params>) - <doc>", so the module
+// name is not at the start of it: the whole line is kept, trimmed, and only
+// filtered on the marker. Slicing from the marker would drop the return
+// assignment — the part the grouping test asserts on.
 func callLines(prompt, module string) []string {
 	marker := module + "."
 	var lines []string
 	for _, line := range strings.Split(prompt, "\n") {
-		if i := strings.Index(line, marker); i >= 0 {
-			lines = append(lines, line[i:])
+		if strings.Contains(line, marker) {
+			lines = append(lines, strings.TrimSpace(line))
 		}
 	}
 	return lines
