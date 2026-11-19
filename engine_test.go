@@ -224,3 +224,176 @@ func TestLoadLayersReportsChunkErrorAtLoadTime(t *testing.T) {
 		t.Fatalf("LoadLayers error = %v, want the chunk's own error", err)
 	}
 }
+
+func TestBlankEngineLoadsBuiltInModules(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	mods := engine.GetModules()
+	if len(mods) == 0 {
+		t.Fatal("NewBlankLayerEngine has no modules, want the built-in set")
+	}
+
+	// The sandbox a blank engine gives a hand-loaded layer must be the one the
+	// codegen prompt describes, so system.version() has to resolve.
+	if err := engine.LoadLayers([]Layer{{
+		Name:   "version",
+		Output: []LayerOutput{{Name: "out"}},
+		Code:   "function version() return system.version() end",
+	}}); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	output, err := engine.RunLayer("version", nil)
+	if err != nil {
+		t.Fatalf("RunLayer: %v", err)
+	}
+	values, ok := output.([]any)
+	if !ok || len(values) != 1 {
+		t.Fatalf("RunLayer output = %#v, want one value", output)
+	}
+}
+
+func TestGetModulesReturnsACopy(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	first := engine.GetModules()
+	if len(first) == 0 {
+		t.Fatal("GetModules returned no modules")
+	}
+	first[0] = nil
+
+	second := engine.GetModules()
+	if len(second) == 0 || second[0] == nil {
+		t.Fatal("mutating the slice returned by GetModules changed the engine's module set")
+	}
+}
+
+func TestCommitRejectsLayerNameOwnedByAnotherFlow(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	firstCode := "function format(value) return tostring(value) end"
+	if err := engine.commitLayers("flow_a", map[string]*Layer{
+		"format": {Name: "format", Code: firstCode},
+	}, nil); err != nil {
+		t.Fatalf("commitLayers flow_a: %v", err)
+	}
+
+	err := engine.commitLayers("flow_b", map[string]*Layer{
+		"format": {Name: "format", Code: "function format(value) return 'x' .. value end"},
+	}, nil)
+	if err == nil {
+		t.Fatal("commitLayers flow_b succeeded, want a collision error")
+	}
+	if !strings.Contains(err.Error(), `"format"`) || !strings.Contains(err.Error(), `"flow_a"`) {
+		t.Fatalf("collision error = %v, want it to name the layer and the owning flow", err)
+	}
+
+	layer, ok := engine.Layer("format")
+	if !ok || layer.Code != firstCode {
+		t.Fatalf("Layer(format) = %#v, want the code flow_a loaded", layer)
+	}
+}
+
+func TestCommitSharesIdenticalCodeBetweenFlows(t *testing.T) {
+	engine := NewBlankLayerEngine()
+	code := "function format(value) return tostring(value) end"
+
+	if err := engine.commitLayers("flow_a", map[string]*Layer{
+		"format": {Name: "format", Code: code},
+	}, nil); err != nil {
+		t.Fatalf("commitLayers flow_a: %v", err)
+	}
+	if err := engine.commitLayers("flow_b", map[string]*Layer{
+		"format": {Name: "format", Code: code},
+	}, nil); err != nil {
+		t.Fatalf("commitLayers flow_b with identical code: %v", err)
+	}
+}
+
+func TestLoadLayersMayReplaceAnUnownedLayer(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	if err := engine.LoadLayers([]Layer{{Name: "format", Code: "function format() return 1 end"}}); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	if err := engine.LoadLayers([]Layer{{Name: "format", Code: "function format() return 2 end"}}); err != nil {
+		t.Fatalf("LoadLayers replacing an unowned layer: %v", err)
+	}
+}
+
+func TestCommitLeavesEngineUnchangedWhenFlowRegistrationFails(t *testing.T) {
+	engine := NewBlankLayerEngine()
+
+	compiled := map[string]*Layer{
+		"increment": {Name: "increment", Code: "function increment(value) return value + 1 end"},
+	}
+	flow := &Flow{
+		Name: "broken",
+		Layers: []Layer{
+			{Name: "increment", Code: compiled["increment"].Code},
+			{Name: "missing", Code: "function missing(value) return value end"},
+		},
+	}
+
+	if err := engine.commitLayers("broken", compiled, flow); err == nil {
+		t.Fatal("commitLayers succeeded, want a not-found error for layer \"missing\"")
+	}
+	if _, loaded := engine.Layer("increment"); loaded {
+		t.Fatal("commitLayers left layer \"increment\" loaded after the flow failed to register")
+	}
+	if _, err := engine.RunFlow("broken", nil); err == nil {
+		t.Fatal("commitLayers registered flow \"broken\" after failing")
+	}
+}
+
+func TestLayerInputsRejectsUnknownName(t *testing.T) {
+	flow := &Flow{
+		Name:  "unknown_input",
+		Input: []FlowInput{{Name: "start", Type: "number", Description: "start value"}},
+		Layers: []Layer{{
+			Name:  "consume",
+			Input: []string{"nowhere"},
+		}},
+	}
+
+	err := layerInputsError(flow, 0)
+	if err == nil || !strings.Contains(err.Error(), `input "nowhere"`) {
+		t.Fatalf("layerInputs error = %v, want an unknown-input error naming it", err)
+	}
+}
+
+func TestLayerInputsMapsFlowInputsAndEarlierOutputs(t *testing.T) {
+	flow := &Flow{
+		Name: "mapped",
+		Input: []FlowInput{
+			{Name: "start", Type: "number", Description: "start value", Optional: true},
+		},
+		Layers: []Layer{
+			{Name: "first", Output: []LayerOutput{{Name: "sum", Type: "number", Description: "the sum"}}},
+			{Name: "second", Input: []string{"start", "sum"}},
+		},
+	}
+
+	inputs, err := layerInputs(flow, 1)
+	if err != nil {
+		t.Fatalf("layerInputs: %v", err)
+	}
+	if len(inputs) != 2 {
+		t.Fatalf("layerInputs returned %d inputs, want 2", len(inputs))
+	}
+	if inputs[0].Name != "start" || inputs[0].Type != "number" || inputs[0].Description != "start value" || !inputs[0].Optional {
+		t.Fatalf("flow input mapped to %#v", inputs[0])
+	}
+	if inputs[1].Name != "sum" || inputs[1].Type != "number" || inputs[1].Description != "the sum" {
+		t.Fatalf("earlier output mapped to %#v", inputs[1])
+	}
+	if inputs[1].Optional {
+		t.Fatal("an input produced by an earlier layer must not be optional")
+	}
+}
+
+// layerInputsError is layerInputs with the value discarded, so a test can assert
+// on the error without naming an unused slice.
+func layerInputsError(flow *Flow, index int) error {
+	_, err := layerInputs(flow, index)
+	return err
+}

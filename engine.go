@@ -2,7 +2,6 @@ package layerengine
 
 import (
 	"fmt"
-	"maps"
 	"strings"
 	"sync"
 
@@ -16,6 +15,10 @@ type LayerEngine struct {
 	layers     map[string]*Layer
 	flows      map[string][]*Layer
 	flowInputs map[string][]FlowInput
+	// layerOwner records which flow loaded each layer. Layer names are
+	// engine-global, so this is what lets a second flow be refused instead of
+	// silently overwriting the first flow's code.
+	layerOwner map[string]string
 	codegen    *codegen.CodeGen
 	mods       []modules.Module
 }
@@ -29,8 +32,11 @@ func NewLayerEngine(codegenertor *codegen.CodeGen) *LayerEngine {
 	return layerEngine
 }
 
+// "Blank" means no LLM: the built-in modules are loaded all the same,
+// so the sandbox is the one the codegen prompt describes and
+// a hand-loaded layer calling system.version() behaves as it would on a full engine.
 func NewBlankLayerEngine() *LayerEngine {
-	layerEngine := &LayerEngine{}
+	layerEngine := &LayerEngine{mods: modules.AllModules()}
 	layerEngine.init()
 	return layerEngine
 }
@@ -39,6 +45,7 @@ func (le *LayerEngine) init() {
 	le.layers = map[string]*Layer{}
 	le.flows = map[string][]*Layer{}
 	le.flowInputs = map[string][]FlowInput{}
+	le.layerOwner = map[string]string{}
 }
 
 // LoadModules adds modules to the engine, after holding the set to what it
@@ -64,33 +71,16 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 		return fmt.Errorf("code generator is not configured")
 	}
 
-	flowInputMap := map[string]FlowInput{}
-	for _, fi := range flow.Input {
-		flowInputMap[fi.Name] = fi
-	}
-
-	flowOutputMap := map[string]codegen.Output{}
-
 	le.mu.RLock()
 	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
 
 	for i, layer := range flow.Layers {
-		inputs := make([]codegen.Input, len(layer.Input))
-		for j, inpName := range layer.Input {
-			if fi, exists := flowInputMap[inpName]; exists {
-				codegen.MapToStruct(StructToMap(fi), &inputs[j])
-			} else {
-				codegen.MapToStruct(StructToMap(flowOutputMap[inpName]), &inputs[j])
-				inputs[j].Optional = false
-			}
+		inputs, err := layerInputs(flow, i)
+		if err != nil {
+			return err
 		}
-
-		outputs := make([]codegen.Output, len(layer.Output))
-		for j, out := range layer.Output {
-			codegen.MapToStruct(StructToMap(out), &outputs[j])
-			flowOutputMap[out.Name] = outputs[j]
-		}
+		outputs := toCodegenOutputs(layer.Output)
 
 		code, err := le.codegen.GenerateLayerFunction(
 			layer.Name,
@@ -109,6 +99,75 @@ func (le *LayerEngine) GenerateLayers(flow *Flow) error {
 	return nil
 }
 
+// layerInputs maps one layer's declared input names onto codegen.Input, looking
+// each name up among the flow's inputs and the outputs of the layers before
+// index.
+//
+// A name that is in neither is an error rather than an empty codegen.Input: it
+// would otherwise reach the LLM as an input with no name and no type, and the
+// layer would be generated against a contract nobody wrote.
+func layerInputs(flow *Flow, index int) ([]codegen.Input, error) {
+	flowInputs := make(map[string]FlowInput, len(flow.Input))
+	for _, fi := range flow.Input {
+		flowInputs[fi.Name] = fi
+	}
+
+	earlierOutputs := make(map[string]LayerOutput)
+	for i := range index {
+		for _, out := range flow.Layers[i].Output {
+			earlierOutputs[out.Name] = out
+		}
+	}
+
+	layer := flow.Layers[index]
+	inputs := make([]codegen.Input, 0, len(layer.Input))
+	for _, name := range layer.Input {
+		if fi, ok := flowInputs[name]; ok {
+			inputs = append(inputs, codegen.Input{
+				Name:        fi.Name,
+				Type:        fi.Type,
+				Description: fi.Description,
+				Optional:    fi.Optional,
+			})
+			continue
+		}
+
+		out, ok := earlierOutputs[name]
+		if !ok {
+			return nil, fmt.Errorf(
+				"layer %q: input %q is not a flow input and is not produced by an earlier layer",
+				layer.Name, name,
+			)
+		}
+		inputs = append(inputs, codegen.Input{
+			Name:        out.Name,
+			Type:        out.Type,
+			Description: out.Description,
+			// An earlier layer always produces its declared outputs.
+			Optional: false,
+		})
+	}
+	return inputs, nil
+}
+
+// toCodegenOutputs maps a layer's declared outputs onto codegen.Output.
+func toCodegenOutputs(outputs []LayerOutput) []codegen.Output {
+	converted := make([]codegen.Output, len(outputs))
+	for i, out := range outputs {
+		converted[i] = codegen.Output{
+			Name:        out.Name,
+			Type:        out.Type,
+			Description: out.Description,
+		}
+	}
+	return converted
+}
+
+// LoadSpec validates a flow spec, generates every layer, and loads the flow.
+//
+// It is all or nothing: layers are compiled into a local map and the engine is
+// written once, at the end, so a spec that fails at registration leaves no
+// half-loaded layers behind.
 func (le *LayerEngine) LoadSpec(spec string) error {
 	f, err := validator.Run([]byte(spec))
 	if err != nil {
@@ -118,25 +177,36 @@ func (le *LayerEngine) LoadSpec(spec string) error {
 	var flow Flow
 	MapToStruct(validator.StructToMap(f), &flow)
 
-	err = le.GenerateLayers(&flow)
+	if err := le.GenerateLayers(&flow); err != nil {
+		return err
+	}
+
+	compiledLayers, err := le.compileLayers(flow.Layers)
 	if err != nil {
 		return err
 	}
 
-	if err := le.LoadLayers(flow.Layers); err != nil {
-		return err
-	}
-	if err := le.LoadFlow(flow); err != nil {
-		return err
-	}
-
-	return nil
+	return le.commitLayers(flow.Name, compiledLayers, &flow)
 }
 
 // LoadLayers compiles and loads all layers. It leaves the engine unchanged if
 // any layer cannot be compiled, or if a compiled chunk does not define a global
 // function named after its layer.
+//
+// Layers loaded this way are unowned: no flow is recorded as their source, so a
+// later hand load may replace them. Flow-owned layers come from LoadSpec, which
+// is the path that refuses to let a second flow replace a name.
 func (le *LayerEngine) LoadLayers(layers []Layer) error {
+	compiledLayers, err := le.compileLayers(layers)
+	if err != nil {
+		return err
+	}
+	return le.commitLayers("", compiledLayers, nil)
+}
+
+// compileLayers parses, compiles and checks every layer without touching engine
+// state, so a set that fails partway through leaves the engine as it was.
+func (le *LayerEngine) compileLayers(layers []Layer) (map[string]*Layer, error) {
 	le.mu.RLock()
 	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
@@ -147,13 +217,13 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 		layer := layers[i]
 		name := strings.TrimSpace(layer.Name)
 		if _, exists := seenNames[name]; exists {
-			return fmt.Errorf("duplicate layer name %q", layer.Name)
+			return nil, fmt.Errorf("duplicate layer name %q", layer.Name)
 		}
 		seenNames[name] = struct{}{}
 
 		fnProto, err := ParseAndCompileLuaCode(layer.Code)
 		if err != nil {
-			return fmt.Errorf("compile layer %q: %w", layer.Name, err)
+			return nil, fmt.Errorf("compile layer %q: %w", layer.Name, err)
 		}
 		layer.FnProto = fnProto
 
@@ -161,16 +231,99 @@ func (le *LayerEngine) LoadLayers(layers []Layer) error {
 		// the function the runner looks up by name. Check that here so a
 		// misnamed or empty layer fails at load, not at RunFlow.
 		if err := checkLayerDefinesFunction(&layer, mods); err != nil {
-			return err
+			return nil, err
 		}
 
 		compiledLayers[layer.Name] = &layer
 	}
+	return compiledLayers, nil
+}
 
+// commitLayers installs compiled layers and, when flow is non-nil, registers it
+// too — under one write lock, so a load happens completely or not at all.
+//
+// Layer names are engine-global. A name already owned by a flow cannot be
+// replaced by different code, and the error names the flow that holds it.
+// Identical code is accepted and the layer already loaded is kept, which makes
+// re-loading the same spec idempotent and keeps pointers held by a registered
+// flow valid. An unowned layer — one loaded by hand through LoadLayers — may be
+// replaced, because that path is the explicit override.
+func (le *LayerEngine) commitLayers(flowName string, compiledLayers map[string]*Layer, flow *Flow) error {
 	le.mu.Lock()
 	defer le.mu.Unlock()
-	maps.Copy(le.layers, compiledLayers)
+
+	// Decide what each name resolves to before writing anything.
+	effective := make(map[string]*Layer, len(compiledLayers))
+	for name, layer := range compiledLayers {
+		existing, ok := le.layers[name]
+		switch {
+		case !ok || existing == nil:
+			effective[name] = layer
+		case existing.Code == layer.Code:
+			effective[name] = existing
+		default:
+			owner := le.layerOwner[name]
+			if owner != "" && owner != flowName {
+				return fmt.Errorf(
+					"layer %q is already loaded by flow %q and this flow generates different code for it; layer names are engine-global, so rename one of the two layers",
+					name, owner,
+				)
+			}
+			effective[name] = layer
+		}
+	}
+
+	// Resolve the flow's layer list against what this commit will install plus
+	// what is already loaded, so a flow that cannot be registered leaves the
+	// engine untouched.
+	var flowLayers []*Layer
+	if flow != nil {
+		resolved, err := le.resolveFlowLayersLocked(*flow, effective)
+		if err != nil {
+			return err
+		}
+		flowLayers = resolved
+	}
+
+	for name, layer := range effective {
+		if existing, ok := le.layers[name]; ok && existing == layer {
+			continue
+		}
+		le.layers[name] = layer
+		if flowName != "" {
+			le.layerOwner[name] = flowName
+		}
+	}
+
+	if flow != nil {
+		le.flows[flow.Name] = flowLayers
+		le.flowInputs[flow.Name] = flow.Input
+	}
 	return nil
+}
+
+// resolveFlowLayersLocked builds a flow's layer list from staged and already
+// loaded layers. The caller holds le.mu for writing.
+func (le *LayerEngine) resolveFlowLayersLocked(flow Flow, staged map[string]*Layer) ([]*Layer, error) {
+	layers := make([]*Layer, 0, len(flow.Layers))
+	seenNames := make(map[string]struct{}, len(flow.Layers))
+	for _, layer := range flow.Layers {
+		name := strings.TrimSpace(layer.Name)
+		if _, exists := seenNames[name]; exists {
+			return nil, fmt.Errorf("load flow %q: duplicate layer name %q", flow.Name, layer.Name)
+		}
+		seenNames[name] = struct{}{}
+
+		loadedLayer, ok := staged[layer.Name]
+		if !ok {
+			loadedLayer, ok = le.layers[layer.Name]
+		}
+		if !ok || loadedLayer == nil {
+			return nil, fmt.Errorf("load flow %q: layer %q not found", flow.Name, layer.Name)
+		}
+		layers = append(layers, loadedLayer)
+	}
+	return layers, nil
 }
 
 // LoadFlow registers a flow after confirming that every referenced layer was
@@ -179,20 +332,9 @@ func (le *LayerEngine) LoadFlow(flow Flow) error {
 	le.mu.Lock()
 	defer le.mu.Unlock()
 
-	layers := make([]*Layer, 0, len(flow.Layers))
-	seenNames := make(map[string]struct{}, len(flow.Layers))
-	for _, layer := range flow.Layers {
-		name := strings.TrimSpace(layer.Name)
-		if _, exists := seenNames[name]; exists {
-			return fmt.Errorf("load flow %q: duplicate layer name %q", flow.Name, layer.Name)
-		}
-		seenNames[name] = struct{}{}
-
-		loadedLayer, ok := le.layers[layer.Name]
-		if !ok || loadedLayer == nil {
-			return fmt.Errorf("load flow %q: layer %q not found", flow.Name, layer.Name)
-		}
-		layers = append(layers, loadedLayer)
+	layers, err := le.resolveFlowLayersLocked(flow, nil)
+	if err != nil {
+		return err
 	}
 	le.flows[flow.Name] = layers
 	le.flowInputs[flow.Name] = flow.Input
@@ -271,41 +413,17 @@ func (le *LayerEngine) GenerateLayer(flow *Flow, index int) error {
 		return fmt.Errorf("layer index %d out of range (flow has %d layers)", index, len(flow.Layers))
 	}
 
-	flowInputMap := make(map[string]FlowInput, len(flow.Input))
-	for _, fi := range flow.Input {
-		flowInputMap[fi.Name] = fi
+	inputs, err := layerInputs(flow, index)
+	if err != nil {
+		return err
 	}
-
-	// Outputs of earlier layers are available as inputs to this one.
-	flowOutputMap := make(map[string]codegen.Output)
-	for i := range index {
-		for _, out := range flow.Layers[i].Output {
-			var o codegen.Output
-			codegen.MapToStruct(StructToMap(out), &o)
-			flowOutputMap[out.Name] = o
-		}
-	}
-
-	layer := flow.Layers[index]
-
-	inputs := make([]codegen.Input, len(layer.Input))
-	for i, inpName := range layer.Input {
-		if fi, exists := flowInputMap[inpName]; exists {
-			codegen.MapToStruct(StructToMap(fi), &inputs[i])
-		} else {
-			codegen.MapToStruct(StructToMap(flowOutputMap[inpName]), &inputs[i])
-			inputs[i].Optional = false
-		}
-	}
-
-	outputs := make([]codegen.Output, len(layer.Output))
-	for i, out := range layer.Output {
-		codegen.MapToStruct(StructToMap(out), &outputs[i])
-	}
+	outputs := toCodegenOutputs(flow.Layers[index].Output)
 
 	le.mu.RLock()
 	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
+
+	layer := flow.Layers[index]
 
 	code, err := le.codegen.GenerateLayerFunction(
 		layer.Name,
@@ -323,6 +441,12 @@ func (le *LayerEngine) GenerateLayer(flow *Flow, index int) error {
 	return nil
 }
 
+// GetModules returns the module set every layer sandbox gets.
+//
+// The slice is a copy: appending to it cannot reach the engine's own set, and
+// the read is guarded like every other accessor here.
 func (le *LayerEngine) GetModules() []modules.Module {
-	return le.mods
+	le.mu.RLock()
+	defer le.mu.RUnlock()
+	return append([]modules.Module(nil), le.mods...)
 }

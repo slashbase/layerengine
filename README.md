@@ -20,9 +20,11 @@ The engine then does three things:
 
 For safety, every layer runs in its own private Lua environment with a whitelisted standard library and a 60-second timeout. A layer can't reach the filesystem, spawn a process, or hang the engine, and its variables can't leak into other layers — when a layer finishes, its environment is closed before the next one starts.
 
-Generated code starts with pure computation. When a layer needs to do something real — call an API, need http client or database connection to read/write data — you register a **module** that exposes it on the `layer` table; see [Modules](#modules).
+Generated code starts with pure computation. When a layer needs to do something real — call an API, need http client or database connection to read/write data — you register a **module**, whose functions the sandbox binds as a global named after the module (`weather.temperature(...)`); see [Modules](#modules).
 
 ## Quickstart
+
+Requires Go 1.26 or newer — that is the floor in `go.mod`.
 
 ```bash
 # 1. Clone
@@ -138,6 +140,25 @@ func main() {
 	fmt.Println(out)
 }
 ```
+
+### Engine API at a glance
+
+| Method | What it does |
+| --- | --- |
+| `LoadSpec(spec string) error` | Validate a spec, generate every layer and load the flow — all or nothing |
+| `GenerateLayers(flow *Flow) error` | Generate Lua for every layer and store it on the flow, without loading |
+| `GenerateLayer(flow *Flow, index int) error` | Regenerate one layer, e.g. after a retry |
+| `LoadLayers(layers []Layer) error` | Compile and load hand-written layers; no LLM involved |
+| `LoadFlow(flow Flow) error` | Register a flow whose layers are already loaded |
+| `Layer(name string) (*Layer, bool)` | Read back a loaded layer, including its generated `Code` |
+| `RunFlow(name string, inputs map[string]any) (any, error)` | Run a flow with lenient input coercion |
+| `RunFlowWithOptions(name string, inputs map[string]any, opts CoerceOptions) (any, error)` | The same, with a strict / keep-undeclared input policy |
+| `RunLayer(name string, inputs []any) (any, error)` | Run one loaded layer on positional arguments |
+| `GetModules() []modules.Module` | The module set every layer sandbox gets (a copy) |
+
+`NewLayerEngine(generator)` needs an LLM; `NewBlankLayerEngine()` has none but loads the same built-in modules, so a hand-loaded layer runs against the sandbox the codegen prompt describes — `system.version()` resolves on both.
+
+**Layer names are engine-global.** A flow's layers are keyed by name in one engine-wide map, so two flows cannot both own a layer called `format` with different code: loading the second fails and names the flow that already holds the name. Identical code is shared, which keeps re-loading the same spec idempotent. Layers loaded by hand through `LoadLayers` are unowned, and a later hand load may replace them.
 
 ## Modules
 
