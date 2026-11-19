@@ -1,0 +1,154 @@
+name: personal_expenses
+description: Takes a month of personal spend as text, parses it, totals it by category, checks each category against a monthly cap, works out how much of the salary was saved, and renders one formatted report.
+input:
+  - ledger_text:
+      type: string
+      description: one month of spend, one entry per line as "what,category,amount in rupees". Blank lines and lines starting with '#' are ignored.
+  - monthly_income:
+      type: number
+      description: take-home salary for the month, in rupees
+  - savings_target:
+      type: number
+      description: the savings rate the person is aiming for, as a percentage of income. When absent, use 30.
+      optional: true
+layers:
+  - name: parse_ledger
+    description: |
+      Split ledger_text into lines on the newline character and walk them in order.
+      For each line: trim leading and trailing whitespace; skip it when it is empty
+      or when its first character is '#'. Split the remaining text on ',' into fields
+      and trim each field. A line is well-formed only when it has exactly three
+      fields, the first two are non-empty after trimming, and the third converts
+      with tonumber. For a well-formed line, append a table {name = field1,
+      category = field2, amount = tonumber(field3)} to an entries array, keeping the
+      original line order. For every line that is not well-formed, increment a
+      malformed counter instead of appending anything. Return the entries array
+      first and the malformed count second.
+    input:
+      - ledger_text
+    output:
+      - entries:
+          type: array
+          description: array of tables, each with name, category and amount fields, in original line order
+      - malformed_count:
+          type: integer
+          description: number of non-blank, non-comment lines that did not parse into three valid fields
+
+  - name: apply_category_rules
+    description: |
+      Walk the entries array in order. For each entry: lowercase and trim its
+      category string, and round its amount to two decimals with
+      math.floor(amount * 100 + 0.5) / 100. Skip the entry entirely when the
+      rounded amount is zero or negative. Otherwise append a table {name, category,
+      amount} carrying the normalised category and the rounded amount to a
+      categorized array, preserving order, and add that amount into a
+      category_totals table keyed by the lowercased category. Keep a running sum of
+      every kept amount and round the final sum to two decimals. Once every entry
+      has been walked, round each value in category_totals to two decimals with the
+      same math.floor(x * 100 + 0.5) / 100 formula, so that floating-point drift
+      from adding many amounts can never push a total past a whole-rupee cap.
+      Return the categorized array first, the category_totals table second, and the
+      rounded sum third.
+    input:
+      - entries
+    output:
+      - categorized:
+          type: array
+          description: entries with lowercased trimmed category and amount rounded to two decimals; non-positive amounts removed
+      - category_totals:
+          type: object
+          description: table mapping each lowercased category name to the sum of its amounts, each total rounded to two decimals
+      - subtotal:
+          type: number
+          description: total spent across all kept entries, rounded to two decimals
+
+  - name: check_budget_caps
+    description: |
+      Hold these monthly caps in rupees, keyed by the lowercased category name:
+      rent 20000, groceries 12000, transport 6000, eating out 4000, utilities 3000,
+      health 3000, shopping 5000, investments 20000, other 2000. Walk the
+      category_totals table and collect, into an array, the name of every category
+      whose total is strictly greater than its cap; a category that is not in the
+      cap table is ignored, never treated as a breach. Sort that array of names
+      alphabetically. Then sum every cap in the table into one number, sum every
+      total in category_totals into another, and subtract the second from the first,
+      rounding the result to two decimals with math.floor(x * 100 + 0.5) / 100; the result is negative when the month
+      spent more than the caps allow in total. Return the array of breached
+      categories first and the remaining budget second.
+    input:
+      - category_totals
+    output:
+      - over_budget_categories:
+          type: array
+          description: alphabetically sorted names of categories whose total exceeded its monthly cap
+      - remaining_budget:
+          type: number
+          description: sum of all caps minus sum of all category totals, rounded to two decimals; negative means the month overspent overall
+
+  - name: savings_check
+    description: |
+      Round every value in this layer to two decimals with
+      math.floor(x * 100 + 0.5) / 100. Compute the amount kept this month as
+      monthly_income minus subtotal, rounded. Compute the savings rate as that amount divided by
+      monthly_income, multiplied by 100 and rounded to two decimals, and return 0 for
+      the rate when monthly_income is zero or negative. Compute the daily average as
+      the subtotal divided by 31, rounded to two decimals. Use savings_target as the
+      target rate when it is a number, and 30 otherwise, since it may arrive as nil.
+      Derive the verdict from the rate, checking the cases in this order: "on track"
+      when the rate is greater than or equal to the target rate, otherwise "ok" when
+      the rate is at least 20, otherwise "tight" when the rate is at least 10,
+      otherwise "overspending". Return the saved amount first, the rate second, the
+      daily average third, and the verdict string fourth.
+    input:
+      - subtotal
+      - monthly_income
+      - savings_target
+    output:
+      - monthly_savings:
+          type: number
+          description: income minus spend, rounded to two decimals; negative when the month overspent the salary
+      - savings_rate:
+          type: number
+          description: monthly savings as a percentage of income, rounded to two decimals
+      - daily_average:
+          type: number
+          description: spend divided by 31 days, rounded to two decimals
+      - verdict:
+          type: string
+          description: one of "on track", "ok", "tight" or "overspending"
+
+  - name: render_report
+    description: |
+      Build one multi-line report string and return it. Format every rupee amount
+      and the savings rate as a fixed two-decimal string with
+      string.format("%.2f", value), so 4000.1 prints as 4000.10 and 12000 prints as
+      12000.00; the breached-category count and the malformed count print as plain
+      integers. Start with the line
+      "PERSONAL EXPENSE REPORT". Then one line per category in the form
+      "  category: total", with the categories ordered by their total from largest
+      to smallest and ties broken by category name ascending; collect the keys of
+      category_totals into an array and sort that array explicitly, because table key
+      order is not meaningful. Then the lines "Spent: <subtotal>",
+      "Income: <monthly_income>",
+      "Saved: <monthly_savings> (<savings_rate>% of income)",
+      "Budget left across caps: <remaining_budget>", and
+      "Over cap (<count>): <names joined by ', '>" using the breached categories, or
+      "none" when the array is empty. Then "Daily average: <daily_average>",
+      "Verdict: <verdict>", and finally
+      "Malformed lines skipped: <malformed_count>". Join every line with a single
+      newline character and return the whole string as one value.
+    input:
+      - category_totals
+      - subtotal
+      - monthly_income
+      - over_budget_categories
+      - remaining_budget
+      - monthly_savings
+      - savings_rate
+      - daily_average
+      - verdict
+      - malformed_count
+    output:
+      - report:
+          type: string
+          description: the complete multi-line personal expense report
