@@ -20,21 +20,23 @@ var (
 	errLayerMemory  = errors.New("layer exceeded memory limit")
 )
 
-func runLayer(layer *Layer, inputValues []any, mods []modules.Module) ([]any, error) {
+// runLayer runs one layer under ctx: the caller's context bounds the whole
+// call, and the per-layer timeout is derived from it, so either can end the run.
+func runLayer(ctx context.Context, layer *Layer, inputValues []any, mods []modules.Module) ([]any, error) {
 
-	parent, cancelMem := context.WithCancelCause(context.Background())
+	parent, cancelMem := context.WithCancelCause(ctx)
 	defer cancelMem(nil)
 
-	ctx, cancelTimeout := context.WithTimeoutCause(parent, layerExecutionTimeout, errLayerTimeout)
+	runCtx, cancelTimeout := context.WithTimeoutCause(parent, layerExecutionTimeout, errLayerTimeout)
 	defer cancelTimeout()
 
-	go guardMemory(ctx, cancelMem, layerMemoryLimit, errLayerMemory)
+	go guardMemory(runCtx, cancelMem, layerMemoryLimit, errLayerMemory)
 
-	layerRunner := NewLayerRunner(ctx, mods)
+	layerRunner := NewLayerRunner(runCtx, mods)
 	defer layerRunner.Close()
 
 	if err := layerRunner.LoadFunction(layer.FnProto); err != nil {
-		return nil, wrapRunErr(layer, ctx, err)
+		return nil, wrapRunErr(layer, runCtx, err)
 	}
 
 	luaInputs, err := ConvertGoValuesToLuaValues(inputValues)
@@ -43,7 +45,7 @@ func runLayer(layer *Layer, inputValues []any, mods []modules.Module) ([]any, er
 	}
 
 	if err := layerRunner.RunFunction(layer.Name, luaInputs, len(layer.Output)); err != nil {
-		return nil, wrapRunErr(layer, ctx, err)
+		return nil, wrapRunErr(layer, runCtx, err)
 	}
 
 	luaOutput, err := layerRunner.ReadResult(len(layer.Output))
@@ -185,7 +187,9 @@ func checkModulesPublishDeclaredSurface(mods []modules.Module) error {
 	return nil
 }
 
-func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module) (any, error) {
+// runFlow runs the layers in order, threading each layer's outputs into the next
+// layer's inputs, and returns the last layer's outputs in declaration order.
+func runFlow(ctx context.Context, layers []*Layer, inputValues map[string]any, mods []modules.Module) ([]any, error) {
 	var result []any
 	for _, layer := range layers {
 		layerInputValues := make([]any, len(layer.Input))
@@ -193,7 +197,7 @@ func runFlow(layers []*Layer, inputValues map[string]any, mods []modules.Module)
 			layerInputValues[i] = inputValues[inpName]
 		}
 
-		layerResult, err := runLayer(layer, layerInputValues, mods)
+		layerResult, err := runLayer(ctx, layer, layerInputValues, mods)
 		if err != nil {
 			return nil, err
 		}
@@ -245,6 +249,9 @@ func wrapRunErr(layer *Layer, ctx context.Context, err error) error {
 		return fmt.Errorf("layer %q: %w", layer.Name, errLayerMemory)
 	case errLayerTimeout:
 		return fmt.Errorf("layer %q: %w", layer.Name, errLayerTimeout)
+	case context.Canceled:
+		// The caller cancelled: report that, not whatever the Lua state said.
+		return fmt.Errorf("layer %q: %w", layer.Name, context.Canceled)
 	default:
 		return err
 	}

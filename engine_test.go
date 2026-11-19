@@ -397,3 +397,89 @@ func layerInputsError(flow *Flow, index int) error {
 	_, err := layerInputs(flow, index)
 	return err
 }
+
+func TestFlowReturnsTheLoadedDefinition(t *testing.T) {
+	engine := NewBlankLayerEngine()
+	flow := Flow{
+		Name:  "echo",
+		Input: []FlowInput{{Name: "value", Type: "string", Description: "a value"}},
+		Layers: []Layer{{
+			Name:   "echo",
+			Input:  []string{"value"},
+			Output: []LayerOutput{{Name: "result", Type: "string"}},
+			Code:   "function echo(value) return value end",
+		}},
+	}
+	if err := engine.LoadLayers(flow.Layers); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	if err := engine.LoadFlow(flow); err != nil {
+		t.Fatalf("LoadFlow: %v", err)
+	}
+
+	loaded, ok := engine.Flow("echo")
+	if !ok {
+		t.Fatal("Flow did not find the loaded flow")
+	}
+	if loaded.Name != "echo" || len(loaded.Input) != 1 || loaded.Input[0].Name != "value" {
+		t.Fatalf("Flow returned %#v", loaded)
+	}
+	if len(loaded.Layers) != 1 || len(loaded.Layers[0].Output) != 1 || loaded.Layers[0].Output[0].Name != "result" {
+		t.Fatalf("Flow layers = %#v, want the declared output", loaded.Layers)
+	}
+
+	loaded.Name = "mutated"
+	if again, _ := engine.Flow("echo"); again.Name != "echo" {
+		t.Fatal("mutating the returned flow changed the engine's copy")
+	}
+
+	if _, ok := engine.Flow("missing"); ok {
+		t.Fatal("Flow found a flow that was never loaded")
+	}
+}
+
+func TestRunFlowResultKeysOutputsByName(t *testing.T) {
+	engine := NewBlankLayerEngine()
+	flow := Flow{
+		Name:  "shout",
+		Input: []FlowInput{{Name: "text", Type: "string"}},
+		Layers: []Layer{
+			{
+				Name:   "copy",
+				Input:  []string{"text"},
+				Output: []LayerOutput{{Name: "copied", Type: "string"}},
+				Code:   "function copy(text) return text end",
+			},
+			{
+				Name:   "upper",
+				Input:  []string{"copied"},
+				Output: []LayerOutput{{Name: "loud", Type: "string"}},
+				Code:   "function upper(copied) return string.upper(copied) end",
+			},
+		},
+	}
+	if err := engine.LoadLayers(flow.Layers); err != nil {
+		t.Fatalf("LoadLayers: %v", err)
+	}
+	if err := engine.LoadFlow(flow); err != nil {
+		t.Fatalf("LoadFlow: %v", err)
+	}
+
+	result, err := engine.RunFlowResult("shout", map[string]any{"text": "hi"})
+	if err != nil {
+		t.Fatalf("RunFlowResult: %v", err)
+	}
+	if result.Layer != "upper" {
+		t.Fatalf("result.Layer = %q, want the last layer", result.Layer)
+	}
+	if len(result.Outputs) != 1 {
+		t.Fatalf("result.Outputs = %#v, want only the last layer's outputs", result.Outputs)
+	}
+	if got := result.Outputs["loud"]; got != "HI" {
+		t.Fatalf("result.Outputs[loud] = %#v, want \"HI\"", got)
+	}
+
+	if _, err := engine.RunFlowResult("missing", nil); err == nil {
+		t.Fatal("RunFlowResult ran a flow that was never loaded")
+	}
+}

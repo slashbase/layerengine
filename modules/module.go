@@ -17,6 +17,11 @@ import (
 // Manifest is part of the contract: a module declares the functions it exposes
 // as data, and codegen renders the prompt from that declaration. A module with
 // nothing to declare returns the zero Manifest, and renders from Usage() alone.
+//
+// A module value is shared. Init is called once for every layer state the engine
+// builds — once per layer, per run — so state kept on the table Init returns is
+// per-layer and safe. Fields on the module value itself are shared by every
+// layer of every concurrent run: keep them immutable, or guard them.
 type Module interface {
 	Init(l *lua.LState) *lua.LTable
 	Name() string

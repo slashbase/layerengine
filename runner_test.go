@@ -82,7 +82,7 @@ end
 		FnProto: proto,
 	}
 
-	res, err := runLayer(layer, nil, []modules.Module{})
+	res, err := runLayer(context.Background(), layer, nil, []modules.Module{})
 	if err != nil {
 		t.Fatalf("runLayer: %v", err)
 	}

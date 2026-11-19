@@ -154,9 +154,13 @@ func main() {
 | `RunFlow(name string, inputs map[string]any) (any, error)` | Run a flow with lenient input coercion |
 | `RunFlowWithOptions(name string, inputs map[string]any, opts CoerceOptions) (any, error)` | The same, with a strict / keep-undeclared input policy |
 | `RunLayer(name string, inputs []any) (any, error)` | Run one loaded layer on positional arguments |
+| `RunFlowResult(name string, inputs map[string]any) (FlowResult, error)` | The same run, with the last layer's outputs keyed by their declared names |
+| `Flow(name string) (*Flow, bool)` | Read back a loaded flow's definition |
 | `GetModules() []modules.Module` | The module set every layer sandbox gets (a copy) |
 
 `NewLayerEngine(generator)` needs an LLM; `NewBlankLayerEngine()` has none but loads the same built-in modules, so a hand-loaded layer runs against the sandbox the codegen prompt describes — `system.version()` resolves on both.
+
+Every run method has a `…Context` variant — `RunFlowContext`, `RunFlowResultContext`, `RunLayerContext`, `RunFlowWithOptionsContext`. The per-layer 60s timeout is derived from the context you pass, so cancelling it stops the layer that is running and the error wraps `context.Canceled` rather than reporting a timeout. Without a context the run is bounded only by that per-layer limit, so a ten-layer flow can hold a caller for ten minutes.
 
 **Layer names are engine-global.** A flow's layers are keyed by name in one engine-wide map, so two flows cannot both own a layer called `format` with different code: loading the second fails and names the flow that already holds the name. Identical code is shared, which keeps re-loading the same spec idempotent. Layers loaded by hand through `LoadLayers` are unowned, and a later hand load may replace them.
 
@@ -229,6 +233,7 @@ Keep a module's surface tight. It should own its endpoint and take only the argu
 - **Per-layer timeout.** `layerExecutionTimeout` is 60s; a layer that loops forever is killed, not allowed to hang the flow.
 - **Codegen timeout.** LLM requests use a 60s timeout.
 - **Concurrency safety.** The engine guards its layer/flow registries with an `RWMutex`; `RunFlow` takes defensive copies of the layer slice so a concurrent `LoadSpec` can't mutate a running flow's view.
+- **Modules under concurrency.** Every layer builds its own Lua state and `Init` runs once per state, so tables a module returns are per-layer. The module *value* is shared by every layer of every concurrent run: keep mutable state off its fields, or guard it.
 
 **What the layer sandbox covers, and what it doesn't.** Each layer runs with only base, string, table, math and the module tables you register. os, io, debug and package are not opened, and the dynamic loaders (load, loadstring, dofile, getfenv, setfenv, collectgarbage) are removed. Generated code therefore cannot read files, spawn processes, read the environment, or exit the process — host capability is reachable only through a module you expose deliberately as a global in the sandbox.
 

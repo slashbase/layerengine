@@ -1,6 +1,7 @@
 package layerengine
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestRunLayerReturnsInputConversionError(t *testing.T) {
 		t.Fatalf("compile Lua: %v", err)
 	}
 
-	_, err = runLayer(&Layer{Name: "noop", FnProto: proto}, []any{struct{}{}}, []modules.Module{})
+	_, err = runLayer(context.Background(), &Layer{Name: "noop", FnProto: proto}, []any{struct{}{}}, []modules.Module{})
 	if err == nil || !strings.Contains(err.Error(), "unsupported Go value type") {
 		t.Fatalf("runLayer error = %v, want unsupported-type error", err)
 	}

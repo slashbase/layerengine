@@ -36,6 +36,17 @@ type Flow struct {
 	Layers      []Layer     `key:"layers"`
 }
 
+// FlowResult is what a flow run produced: the last layer's outputs keyed by the
+// names that layer declares, and the name of the layer that produced them.
+//
+// Outputs is keyed rather than positional because a caller holding a spec it did
+// not write cannot know the declaration order. It is never nil: a flow whose last
+// layer declares no outputs returns an empty map.
+type FlowResult struct {
+	Outputs map[string]any
+	Layer   string
+}
+
 // Keep all structs above this line
 // Mapping utilities for above structs
 

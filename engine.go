@@ -1,6 +1,7 @@
 package layerengine
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -19,8 +20,11 @@ type LayerEngine struct {
 	// engine-global, so this is what lets a second flow be refused instead of
 	// silently overwriting the first flow's code.
 	layerOwner map[string]string
-	codegen    *codegen.CodeGen
-	mods       []modules.Module
+	// flowDefs keeps each loaded flow's definition, so a caller can read back
+	// what a spec declared after LoadSpec has thrown the parsed spec away.
+	flowDefs map[string]Flow
+	codegen  *codegen.CodeGen
+	mods     []modules.Module
 }
 
 func NewLayerEngine(codegenertor *codegen.CodeGen) *LayerEngine {
@@ -32,9 +36,9 @@ func NewLayerEngine(codegenertor *codegen.CodeGen) *LayerEngine {
 	return layerEngine
 }
 
-// "Blank" means no LLM: the built-in modules are loaded all the same,
-// so the sandbox is the one the codegen prompt describes and
-// a hand-loaded layer calling system.version() behaves as it would on a full engine.
+// "Blank" means no LLM: the built-in modules are loaded all the same, so the sandbox is the one the
+// codegen prompt describes and a hand-loaded layer calling system.version()
+// behaves as it would on a full engine.
 func NewBlankLayerEngine() *LayerEngine {
 	layerEngine := &LayerEngine{mods: modules.AllModules()}
 	layerEngine.init()
@@ -46,6 +50,7 @@ func (le *LayerEngine) init() {
 	le.flows = map[string][]*Layer{}
 	le.flowInputs = map[string][]FlowInput{}
 	le.layerOwner = map[string]string{}
+	le.flowDefs = map[string]Flow{}
 }
 
 // LoadModules adds modules to the engine, after holding the set to what it
@@ -298,6 +303,7 @@ func (le *LayerEngine) commitLayers(flowName string, compiledLayers map[string]*
 	if flow != nil {
 		le.flows[flow.Name] = flowLayers
 		le.flowInputs[flow.Name] = flow.Input
+		le.flowDefs[flow.Name] = *flow
 	}
 	return nil
 }
@@ -338,10 +344,21 @@ func (le *LayerEngine) LoadFlow(flow Flow) error {
 	}
 	le.flows[flow.Name] = layers
 	le.flowInputs[flow.Name] = flow.Input
+	le.flowDefs[flow.Name] = flow
 	return nil
 }
 
+// RunLayer runs one loaded layer on positional arguments.
 func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
+	return le.RunLayerContext(context.Background(), name, inputValues)
+}
+
+// RunLayerContext is RunLayer with a caller-supplied context.
+//
+// Cancelling the context stops the layer: the per-layer timeout is derived from
+// it, so cancellation interrupts the running Lua chunk instead of waiting out
+// the 60s limit. A cancelled run reports context.Canceled, not a timeout.
+func (le *LayerEngine) RunLayerContext(ctx context.Context, name string, inputValues []any) (any, error) {
 	le.mu.RLock()
 	layer, ok := le.layers[name]
 	mods := append([]modules.Module(nil), le.mods...)
@@ -349,8 +366,7 @@ func (le *LayerEngine) RunLayer(name string, inputValues []any) (any, error) {
 	if !ok || layer == nil {
 		return nil, fmt.Errorf("layer %q not found", name)
 	}
-	result, err := runLayer(layer, inputValues, mods)
-	return result, err
+	return runLayer(ctx, layer, inputValues, mods)
 }
 
 // RunFlow runs a loaded flow. Input values are converted to the types the flow
@@ -361,8 +377,43 @@ func (le *LayerEngine) RunFlow(name string, inputValues map[string]any) (any, er
 	return le.RunFlowWithOptions(name, inputValues, CoerceOptions{})
 }
 
+// RunFlowContext is RunFlow with a caller-supplied context; cancelling it stops
+// the flow at the layer that is running.
+func (le *LayerEngine) RunFlowContext(ctx context.Context, name string, inputValues map[string]any) (any, error) {
+	return le.RunFlowWithOptionsContext(ctx, name, inputValues, CoerceOptions{})
+}
+
 // RunFlowWithOptions is RunFlow with an explicit input policy.
 func (le *LayerEngine) RunFlowWithOptions(name string, inputValues map[string]any, opts CoerceOptions) (any, error) {
+	return le.RunFlowWithOptionsContext(context.Background(), name, inputValues, opts)
+}
+
+// RunFlowWithOptionsContext is RunFlowWithOptions with a caller-supplied context.
+func (le *LayerEngine) RunFlowWithOptionsContext(ctx context.Context, name string, inputValues map[string]any, opts CoerceOptions) (any, error) {
+	_, result, err := le.executeFlow(ctx, name, inputValues, opts)
+	return result, err
+}
+
+// RunFlowResult is RunFlow with the result named: the last layer's outputs keyed
+// by the names that layer declares, and the name of the layer that produced
+// them. Use it when the caller did not write the spec and cannot know the
+// positional order of the result.
+func (le *LayerEngine) RunFlowResult(name string, inputValues map[string]any) (FlowResult, error) {
+	return le.RunFlowResultContext(context.Background(), name, inputValues)
+}
+
+// RunFlowResultContext is RunFlowResult with a caller-supplied context.
+func (le *LayerEngine) RunFlowResultContext(ctx context.Context, name string, inputValues map[string]any) (FlowResult, error) {
+	layers, result, err := le.executeFlow(ctx, name, inputValues, CoerceOptions{})
+	if err != nil {
+		return FlowResult{}, err
+	}
+	return namedResult(layers, result), nil
+}
+
+// executeFlow resolves a flow, coerces its inputs and runs it, returning the
+// layers it ran so the caller can name the results.
+func (le *LayerEngine) executeFlow(ctx context.Context, name string, inputValues map[string]any, opts CoerceOptions) ([]*Layer, []any, error) {
 	le.mu.RLock()
 	layers, ok := le.flows[name]
 	if ok {
@@ -372,14 +423,38 @@ func (le *LayerEngine) RunFlowWithOptions(name string, inputValues map[string]an
 	mods := append([]modules.Module(nil), le.mods...)
 	le.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("flow %q not found", name)
+		return nil, nil, fmt.Errorf("flow %q not found", name)
 	}
 
 	workingValues, err := CoerceInputs(flowInputs, inputValues, opts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return runFlow(layers, workingValues, mods)
+
+	result, err := runFlow(ctx, layers, workingValues, mods)
+	if err != nil {
+		return nil, nil, err
+	}
+	return layers, result, nil
+}
+
+// namedResult keys a run's results by the output names the last layer declares.
+// runFlow returns them in declaration order, which is the only thing a caller
+// holding a spec it did not write cannot recover on its own.
+func namedResult(layers []*Layer, result []any) FlowResult {
+	if len(layers) == 0 {
+		return FlowResult{Outputs: map[string]any{}}
+	}
+
+	last := layers[len(layers)-1]
+	outputs := make(map[string]any, len(last.Output))
+	for i, out := range last.Output {
+		if i >= len(result) {
+			break
+		}
+		outputs[out.Name] = result[i]
+	}
+	return FlowResult{Outputs: outputs, Layer: last.Name}
 }
 
 // Layer returns a copy of a loaded layer by name. The copy carries the
@@ -397,6 +472,22 @@ func (le *LayerEngine) Layer(name string) (*Layer, bool) {
 	}
 	snapshot := *layer
 	return &snapshot, true
+}
+
+// Flow returns a copy of a loaded flow's definition by name, so a caller can
+// read back what a spec declared — the input types, and which outputs the last
+// layer produces — after LoadSpec has thrown the parsed spec away.
+//
+// The copy is shallow: the Input and Layers slices are shared with the engine's
+// value, so read them rather than mutate them.
+func (le *LayerEngine) Flow(name string) (*Flow, bool) {
+	le.mu.RLock()
+	defer le.mu.RUnlock()
+	flow, ok := le.flowDefs[name]
+	if !ok {
+		return nil, false
+	}
+	return &flow, true
 }
 
 // GenerateLayer generates the Lua source for a single layer of flow, using the
