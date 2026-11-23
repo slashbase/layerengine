@@ -27,5 +27,7 @@ Output:
 %s
 Output requirements:
 - Lua function output names must exactly match the output names above,  — no renaming, abbreviating, or restructuring.
-- The function must return all the values directly (e.g. 'return output_name1, output_name2') — do NOT wrap it in a table.`, fnName, description, inputStr.String(), outputStr.String())
+- Return one value per declared output, in order, using only expressions or locals you defined. For outputs sum and product: "return a + b, a * b".
+- Never return an output name as a bare identifier — those names are not variables.
+- Do NOT wrap the results in a table.`, fnName, description, inputStr.String(), outputStr.String())
 }

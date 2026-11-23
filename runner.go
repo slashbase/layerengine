@@ -2,6 +2,7 @@ package layerengine
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/slashbase/layerengine/modules"
@@ -88,12 +89,16 @@ func (cr *LayerRunner) GlobalFunctionAt(root, path string) bool {
 }
 
 func (cr *LayerRunner) RunFunction(funName string, arguments []lua.LValue, outputLen int) error {
+	base := cr.luaRunner.GetTop()
 	if err := cr.luaRunner.CallByParam(lua.P{
 		Fn:      cr.luaRunner.GetGlobal(funName),
-		NRet:    outputLen,
+		NRet:    lua.MultRet,
 		Protect: true,
 	}, arguments...); err != nil {
 		return err
+	}
+	if got := cr.luaRunner.GetTop() - base; got != outputLen {
+		return fmt.Errorf("layer function %q returned %d values, want %d", funName, got, outputLen)
 	}
 	return nil
 }

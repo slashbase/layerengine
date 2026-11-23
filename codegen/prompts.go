@@ -15,7 +15,13 @@ Use:`
 	environmentFacts = `This function runs in a restricted Lua 5.1 environment.
 Available: the base library, string, table, math, and the module tables listed below.
 Not available: os, io, debug, package, require, loadfile, module, dofile, load,
-loadstring, getfenv, setfenv, collectgarbage, newproxy, channel, coroutine.`
+loadstring, getfenv, setfenv, collectgarbage, newproxy, channel, coroutine.
+
+Lua 5.1 syntax only. Not available: continue, goto, ::label::, // integer division,
+bitwise operators (& | ~ << >>), utf8, math.type, string.pack, table.unpack (use unpack).
+Write an "if" guard inside the loop instead of continue.
+A for loop's control variable does not exist after the loop ends. To use an index
+afterwards, store it in a variable declared before the loop.`
 )
 
 const (
