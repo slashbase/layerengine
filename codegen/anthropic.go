@@ -26,8 +26,7 @@ func generateLuaFunctionCodeAnthropic(anthropicClient *anthropic.Client, model, 
 	defer cancel()
 
 	resp, err := anthropicClient.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(model),
-		MaxTokens: 1024,
+		Model: anthropic.Model(model),
 		System: []anthropic.TextBlockParam{
 			{Text: GetModuleUsagePrompt(mods)},
 			{Text: promptGuide},
