@@ -11,6 +11,7 @@ type Provider string
 const (
 	ProviderOpenAI    Provider = "openai"
 	ProviderAnthropic Provider = "anthropic"
+	ProviderSarvam    Provider = "sarvam"
 )
 
 // ModelID is a stable identifier for a supported model. Always pass one of the
@@ -38,6 +39,13 @@ const (
 	ClaudeHaiku5_5  ModelID = "claude-haiku-5-5"
 	ClaudeOpus4_6   ModelID = "claude-opus-4.6"
 	ClaudeSonnet4_6 ModelID = "claude-sonnet-4.6"
+
+	// Sarvam
+	Sarvam105B                ModelID = "sarvam-105b"
+	SarvamTFGLM5_3            ModelID = "glm5.3"
+	SarvamTFGLM5_3Flash       ModelID = "glm5.3-flash"
+	SarvamTFGemma4            ModelID = "gemma4"
+	SarvamTFDeepSeekV4_1Flash ModelID = "deepseekv4.1-flash-1017"
 )
 
 type modelInfo struct {
@@ -65,4 +73,10 @@ var models = map[ModelID]modelInfo{
 	ClaudeHaiku5_5:  {ProviderAnthropic, string(anthropic.ModelClaudeHaiku5_5)},
 	ClaudeOpus4_6:   {ProviderAnthropic, string(anthropic.ModelClaudeOpus4_6)},
 	ClaudeSonnet4_6: {ProviderAnthropic, string(anthropic.ModelClaudeSonnet4_6)},
+
+	Sarvam105B:                {ProviderSarvam, string(Sarvam105B)},
+	SarvamTFGLM5_3:            {ProviderSarvam, string(SarvamTFGLM5_3)},
+	SarvamTFGLM5_3Flash:       {ProviderSarvam, string(SarvamTFGLM5_3Flash)},
+	SarvamTFGemma4:            {ProviderSarvam, string(SarvamTFGemma4)},
+	SarvamTFDeepSeekV4_1Flash: {ProviderSarvam, string(SarvamTFDeepSeekV4_1Flash)},
 }

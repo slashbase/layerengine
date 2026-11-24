@@ -52,6 +52,7 @@ func (c Config) CodeGen() (*codegen.CodeGen, error) {
 const (
 	envOpenAIKey    = "OPENAI_API_KEY"
 	envAnthropicKey = "ANTHROPIC_API_KEY"
+	envSarvamKey    = "SARVAM_API_KEY"
 	envModel        = "LAYERENGINE_MODEL"
 	envModelBaseURL = "LAYERENGINE_MODEL_BASE_URL"
 )
@@ -61,6 +62,7 @@ const (
 const (
 	defaultOpenAIModel    = codegen.GPT6Luna
 	defaultAnthropicModel = codegen.ClaudeSonnet5_5
+	defaultSarvamModel    = codegen.SarvamTFGLM5_3Flash
 )
 
 // FromEnv builds a Config from the environment.
@@ -79,8 +81,11 @@ func FromEnv() (Config, error) {
 	case os.Getenv(envAnthropicKey) != "":
 		cfg.APIKey = os.Getenv(envAnthropicKey)
 		cfg.Model = defaultAnthropicModel
+	case os.Getenv(envSarvamKey) != "":
+		cfg.APIKey = os.Getenv(envSarvamKey)
+		cfg.Model = defaultSarvamModel
 	default:
-		return Config{}, fmt.Errorf("config: set %s or %s", envOpenAIKey, envAnthropicKey)
+		return Config{}, fmt.Errorf("config: set %s, %s or %s", envOpenAIKey, envAnthropicKey, envSarvamKey)
 	}
 
 	if model := os.Getenv(envModel); model != "" {

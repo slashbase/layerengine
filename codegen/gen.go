@@ -56,6 +56,8 @@ func NewCodeGenWithBaseURL(apiKey string, model ModelID, baseURL string) (*CodeG
 		cg.openAIClient = newOpenAIClient(apiKey, baseURL)
 	case ProviderAnthropic:
 		cg.anthropicClient = newAnthropicClient(apiKey, baseURL)
+	case ProviderSarvam:
+		cg.openAIClient = newSarvamClient(apiKey, baseURL)
 	}
 	return cg, nil
 }
@@ -66,6 +68,8 @@ func (cg *CodeGen) GenerateLayerFunction(fnName, description string, inputs []In
 		return generateLuaFunctionCode(cg.openAIClient, cg.modelInfo.modelName, fnName, description, inputs, outputs, mods)
 	case ProviderAnthropic:
 		return generateLuaFunctionCodeAnthropic(cg.anthropicClient, cg.modelInfo.modelName, fnName, description, inputs, outputs, mods)
+	case ProviderSarvam:
+		return generateLuaFunctionCodeSarvam(cg.openAIClient, cg.modelInfo.modelName, fnName, description, inputs, outputs, mods)
 	}
 	return "", errors.New("model not supported")
 }
