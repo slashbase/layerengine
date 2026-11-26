@@ -62,7 +62,7 @@ const (
 const (
 	defaultOpenAIModel    = codegen.GPT6Luna
 	defaultAnthropicModel = codegen.ClaudeSonnet5_5
-	defaultSarvamModel    = codegen.SarvamTFGLM5_3Flash
+	defaultSarvamModel    = codegen.SarvamTFDeepSeekV4_1Flash
 )
 
 // FromEnv builds a Config from the environment.

@@ -17,6 +17,18 @@ func generateCodePromptFormat(fnName, description string, inputs []Input, output
 		fmt.Fprintf(&outputStr, "\n\t- name: %s; type: %s; description: %s", out.Name, out.Type, out.Description)
 	}
 
+	var returnStr strings.Builder
+	for i, out := range outputs {
+		if i > 0 {
+			returnStr.WriteString(", ")
+		}
+		fmt.Fprintf(&returnStr, "%s (%s)", out.Name, out.Type)
+	}
+	noun := "values"
+	if len(outputs) == 1 {
+		noun = "value"
+	}
+
 	return fmt.Sprintf(`Function Name: %s
 Description: %s
 Input:
@@ -26,8 +38,7 @@ Input requirements:
 Output: 
 %s
 Output requirements:
-- Lua function output names must exactly match the output names above,  — no renaming, abbreviating, or restructuring.
-- Return one value per declared output, in order, using only expressions or locals you defined. For outputs sum and product: "return a + b, a * b".
-- Never return an output name as a bare identifier — those names are not variables.
-- Do NOT wrap the results in a table.`, fnName, description, inputStr.String(), outputStr.String())
+- Lua function output names must exactly match the output names above — no renaming, abbreviating, or restructuring.
+- Return exactly %d %s, in this order: %s.
+- Return computed expressions or locals you defined, never an output name as a bare identifier, and do not wrap the results in a table.`, fnName, description, inputStr.String(), outputStr.String(), len(outputs), noun, returnStr.String())
 }

@@ -26,7 +26,7 @@ afterwards, store it in a variable declared before the loop.`
 
 const (
 	promptGuide = `Write a Lua function that takes input parameters, processes the input according to given description and returns output.
-Every function body must contain the statements that compute each declared output from the inputs according to "description". Return exactly N values in the declared order.
+Every function body must contain the statements that compute each declared output from the inputs according to "description".
 Write code in json field "code".`
 )
 
