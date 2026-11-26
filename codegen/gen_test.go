@@ -90,7 +90,7 @@ func TestGenerateLayerFunctionAnthropic(t *testing.T) {
 }
 
 func TestNewCodeGenRejectsUnknownModel(t *testing.T) {
-	if _, err := NewCodeGen("test-key", ModelID("not-a-real-model")); err == nil {
+	if _, err := NewCodeGen("test-key", provider.ModelID("not-a-real-model")); err == nil {
 		t.Fatal("expected an error for an unknown model")
 	}
 }

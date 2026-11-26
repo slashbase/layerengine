@@ -45,8 +45,9 @@ type ModelInfo struct {
 }
 
 // models is the single source of truth mapping a ModelID to its provider and
-// SDK name. Add a model by adding one entry here.
-var Models = map[ModelID]ModelInfo{
+// wire name. Add a model by adding one entry here. It is unexported so a caller
+// cannot add or drop a model at runtime; LookupModel is the read side.
+var models = map[ModelID]ModelInfo{
 	GPT6_1Sol:   {ProviderOpenAI, string(openai.ChatModelGPT6_1Sol)},
 	GPT6Sol:     {ProviderOpenAI, string(openai.ChatModelGPT6Sol)},
 	GPT6Luna:    {ProviderOpenAI, string(openai.ChatModelGPT6Luna)},
@@ -70,4 +71,10 @@ var Models = map[ModelID]ModelInfo{
 	SarvamTFGLM5_3Flash:       {ProviderSarvam, string(SarvamTFGLM5_3Flash)},
 	SarvamTFGemma4:            {ProviderSarvam, string(SarvamTFGemma4)},
 	SarvamTFDeepSeekV4_1Flash: {ProviderSarvam, string(SarvamTFDeepSeekV4_1Flash)},
+}
+
+// LookupModel returns the provider and wire name for id.
+func LookupModel(id ModelID) (ModelInfo, bool) {
+	info, ok := models[id]
+	return info, ok
 }

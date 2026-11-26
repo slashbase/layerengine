@@ -1,8 +1,10 @@
 package provider
 
-import "context"
+import (
+	"context"
+)
 
-// Provider identifies an LLM backend.
+// ProviderName identifies an LLM backend.
 type ProviderName string
 
 const (
@@ -37,7 +39,7 @@ var Providers = map[ProviderName]providerFactory{
 // model stopped because it ran out of room, and the vendor's own word for why
 // it stopped.
 //
-// Translating a vendor's stop vocabulary into truncated is the provider's job,
+// Translating a vendor's stop vocabulary into Truncated is the provider's job,
 // so the shared path reports truncation the same way for every provider instead
 // of each one growing its own check.
 type Reply struct {

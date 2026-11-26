@@ -17,8 +17,8 @@ import (
 // Config describes how to reach the LLM that generates layer code.
 type Config struct {
 	// Model selects both the provider and the model, so it must be one of the
-	// exported codegen.ModelID constants. The provider is derived from it.
-	Model codegen.ModelID
+	// exported provider.ModelID constants. The provider is derived from it.
+	Model provider.ModelID
 
 	// APIKey authenticates against the provider that Model belongs to.
 	APIKey string
@@ -90,7 +90,7 @@ func FromEnv() (Config, error) {
 	}
 
 	if model := os.Getenv(envModel); model != "" {
-		cfg.Model = codegen.ModelID(model)
+		cfg.Model = provider.ModelID(model)
 	}
 	cfg.BaseURL = os.Getenv(envModelBaseURL)
 	return cfg, nil

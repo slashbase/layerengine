@@ -36,11 +36,10 @@ type CodeGen struct {
 
 type Input = prompts.Input
 type Output = prompts.Output
-type ModelID = provider.ModelID
 
 // NewCodeGen builds a code generator that talks to the provider's default
 // endpoint. Use NewCodeGenWithOptions to override the endpoint or the timeout.
-func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
+func NewCodeGen(apiKey string, model provider.ModelID) (*CodeGen, error) {
 	return NewCodeGenWithOptions(apiKey, model, Options{})
 }
 
@@ -49,7 +48,7 @@ func NewCodeGen(apiKey string, model ModelID) (*CodeGen, error) {
 // proxy, a compatible gateway, or an httptest server in tests.
 //
 // Deprecated: use NewCodeGenWithOptions(apiKey, model, Options{BaseURL: baseURL}).
-func NewCodeGenWithBaseURL(apiKey string, model ModelID, baseURL string) (*CodeGen, error) {
+func NewCodeGenWithBaseURL(apiKey string, model provider.ModelID, baseURL string) (*CodeGen, error) {
 	return NewCodeGenWithOptions(apiKey, model, Options{BaseURL: baseURL})
 }
 
@@ -57,8 +56,8 @@ func NewCodeGenWithBaseURL(apiKey string, model ModelID, baseURL string) (*CodeG
 //
 // The model chooses the provider, so the two are always consistent: an unknown
 // model is rejected here, and GenerateLayerFunction cannot be reached with one.
-func NewCodeGenWithOptions(apiKey string, model ModelID, opts Options) (*CodeGen, error) {
-	info, ok := provider.Models[model]
+func NewCodeGenWithOptions(apiKey string, model provider.ModelID, opts Options) (*CodeGen, error) {
+	info, ok := provider.LookupModel(model)
 	if !ok {
 		return nil, errors.New("model not supported: " + string(model))
 	}

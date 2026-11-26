@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/slashbase/layerengine/modules"
+	"github.com/slashbase/layerengine/modules/manifest"
 )
 
 const (
@@ -40,7 +40,7 @@ Write code in json field "code".`
 // without breaking this package.
 type Describer interface {
 	Name() string
-	Manifest() modules.Manifest
+	Manifest() manifest.Manifest
 	Usage() string
 }
 
@@ -102,7 +102,7 @@ func renderModuleUsage(m Describer) []string {
 		return renderUsageFallback(m)
 	}
 
-	fns := make([]modules.Function, len(man.Functions))
+	fns := make([]manifest.Function, len(man.Functions))
 	copy(fns, man.Functions)
 	// Sorting by the full name keeps one group's operations adjacent: "." sorts
 	// below every character an identifier can contain, so a dotted name orders
@@ -129,7 +129,7 @@ func renderModuleUsage(m Describer) []string {
 // table to find it in. The assignment is omitted when no return is named. Param
 // and return types are inline annotations, so arity and shape survive in a
 // single line.
-func renderCallLine(module string, fn modules.Function) string {
+func renderCallLine(module string, fn manifest.Function) string {
 	var b strings.Builder
 
 	if named := namedReturns(fn.Returns); named != "" {
@@ -171,13 +171,13 @@ func renderCallLine(module string, fn modules.Function) string {
 // omittable reports whether the caller may leave the argument out: it is marked
 // Optional, or it declares a Default. Both render the same way, so a default
 // always shows up as an optional argument.
-func omittable(p modules.Param) bool {
+func omittable(p manifest.Param) bool {
 	return p.Optional || p.Default != ""
 }
 
 // namedReturns renders "a:type, b:type" for the returns that carry a name, or ""
 // when none do.
-func namedReturns(returns []modules.Return) string {
+func namedReturns(returns []manifest.Return) string {
 	named := false
 	for _, r := range returns {
 		if r.Name != "" {
