@@ -1,9 +1,24 @@
-package codegen
+package prompts
 
 import (
 	"fmt"
 	"strings"
 )
+
+// Input describes a named layer input for code generation.
+type Input struct {
+	Name        string `key:"name"`
+	Type        string `key:"type"`
+	Description string `key:"description"`
+	Optional    bool   `key:"optional"`
+}
+
+// Output describes a named layer output for code generation.
+type Output struct {
+	Name        string `key:"name"`
+	Type        string `key:"type"`
+	Description string `key:"description"`
+}
 
 func generateCodePromptFormat(fnName, description string, inputs []Input, outputs []Output) string {
 

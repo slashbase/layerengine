@@ -1,17 +1,8 @@
-package codegen
+package provider
 
 import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/openai/openai-go/v3"
-)
-
-// Provider identifies an LLM backend.
-type Provider string
-
-const (
-	ProviderOpenAI    Provider = "openai"
-	ProviderAnthropic Provider = "anthropic"
-	ProviderSarvam    Provider = "sarvam"
 )
 
 // ModelID is a stable identifier for a supported model. Always pass one of the
@@ -48,14 +39,14 @@ const (
 	SarvamTFDeepSeekV4_1Flash ModelID = "deepseekv4.1-flash-1017"
 )
 
-type modelInfo struct {
-	provider  Provider
-	modelName string // the string the vendor SDK expects
+type ModelInfo struct {
+	Provider  ProviderName
+	ModelName string // the string the vendor SDK expects
 }
 
 // models is the single source of truth mapping a ModelID to its provider and
 // SDK name. Add a model by adding one entry here.
-var models = map[ModelID]modelInfo{
+var Models = map[ModelID]ModelInfo{
 	GPT6_1Sol:   {ProviderOpenAI, string(openai.ChatModelGPT6_1Sol)},
 	GPT6Sol:     {ProviderOpenAI, string(openai.ChatModelGPT6Sol)},
 	GPT6Luna:    {ProviderOpenAI, string(openai.ChatModelGPT6Luna)},

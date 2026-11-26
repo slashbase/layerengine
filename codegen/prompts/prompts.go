@@ -1,4 +1,4 @@
-package codegen
+package prompts
 
 import (
 	"fmt"
@@ -30,6 +30,40 @@ Every function body must contain the statements that compute each declared outpu
 Write code in json field "code".`
 )
 
+// Describer is the slice of a module the prompt builder needs: what it is
+// called, the surface it declares, and its free-text fallback.
+//
+// It is deliberately narrower than modules.Module. A module has to implement
+// Init — which drags gopher-lua into anything that only wants to render a
+// prompt — but the prompt never calls it. Naming the three methods it does use
+// keeps the dependency where it belongs and leaves modules.Module free to grow
+// without breaking this package.
+type Describer interface {
+	Name() string
+	Manifest() modules.Manifest
+	Usage() string
+}
+
+// Prompt is the message pair sent to a provider: the system messages, in the
+// order they must be sent, and the user message.
+//
+// It is exported so a caller can see or keep what codegen would send — the
+// starting point for caching, replaying, or diffing prompts without reaching
+// into the package.
+type Prompt struct {
+	System []string
+	User   string
+}
+
+// BuildPrompt assembles the whole prompt for one layer function. It is the one
+// place the system/user split and the message order are decided.
+func BuildPrompt[T Describer](fnName, description string, inputs []Input, outputs []Output, mods []T) Prompt {
+	return Prompt{
+		System: []string{GetModuleUsagePrompt(mods), promptGuide},
+		User:   generateCodePromptFormat(fnName, description, inputs, outputs),
+	}
+}
+
 // GetModuleUsagePrompt renders the module surface into the codegen prompt.
 //
 // Each declared function renders as a single call-shaped line, the way a module
@@ -41,9 +75,11 @@ Write code in json field "code".`
 // nothing declared, so it falls back to its Usage() text under a <name>
 // heading. Modules and functions are sorted, so the same module set always
 // produces the same prompt.
-func GetModuleUsagePrompt(mods []modules.Module) string {
-	sorted := make([]modules.Module, len(mods))
-	copy(sorted, mods)
+func GetModuleUsagePrompt[T Describer](mods []T) string {
+	sorted := make([]Describer, len(mods))
+	for i := range mods {
+		sorted[i] = mods[i]
+	}
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Name() < sorted[j].Name() })
 
 	lines := make([]string, 0, len(sorted))
@@ -60,7 +96,7 @@ func GetModuleUsagePrompt(mods []modules.Module) string {
 
 // renderModuleUsage renders one module: one line per declared function, plus a
 // single line for module-level notes.
-func renderModuleUsage(m modules.Module) []string {
+func renderModuleUsage(m Describer) []string {
 	man := m.Manifest()
 	if man.Validate() != nil {
 		return renderUsageFallback(m)
@@ -173,7 +209,7 @@ func namedReturns(returns []modules.Return) string {
 
 // renderUsageFallback renders a module that declares no surface: its Usage() text
 // under a <name> heading, unchanged from the free-text days.
-func renderUsageFallback(m modules.Module) []string {
+func renderUsageFallback(m Describer) []string {
 	var b strings.Builder
 	b.WriteString(m.Name())
 	writeCommentBlock(&b, "  ", strings.TrimSpace(m.Usage()))

@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/slashbase/layerengine/codegen"
+	"github.com/slashbase/layerengine/codegen/provider"
 )
 
 // Config describes how to reach the LLM that generates layer code.
@@ -60,9 +61,9 @@ const (
 // Default models FromEnv picks when a provider key is present and no model is
 // requested.
 const (
-	defaultOpenAIModel    = codegen.GPT6Luna
-	defaultAnthropicModel = codegen.ClaudeSonnet5_5
-	defaultSarvamModel    = codegen.SarvamTFDeepSeekV4_1Flash
+	defaultOpenAIModel    = provider.GPT6Luna
+	defaultAnthropicModel = provider.ClaudeSonnet5_5
+	defaultSarvamModel    = provider.SarvamTFDeepSeekV4_1Flash
 )
 
 // FromEnv builds a Config from the environment.

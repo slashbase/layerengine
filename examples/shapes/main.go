@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/slashbase/layerengine"
-	"github.com/slashbase/layerengine/codegen"
+	"github.com/slashbase/layerengine/codegen/prompts"
 	"github.com/slashbase/layerengine/config"
 	"github.com/slashbase/layerengine/modules"
 )
@@ -35,7 +35,7 @@ func main() {
 	// What the model is shown. Four lines, contiguous per shape, because the
 	// manifest names are paths and the prompt sorts by full name.
 	fmt.Println("---MODULE SURFACE---")
-	fmt.Println(codegen.GetModuleUsagePrompt([]modules.Module{Shapes{}}))
+	fmt.Println(prompts.GetModuleUsagePrompt([]modules.Module{Shapes{}}))
 
 	data, err := os.ReadFile("./examples/shapes/flow.yaml")
 	if err != nil {

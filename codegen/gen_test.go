@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/slashbase/layerengine/codegen/provider"
 )
 
 // These tests point the provider clients at a local server through
@@ -21,7 +23,7 @@ func TestGenerateLayerFunctionOpenAI(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cg, err := NewCodeGenWithBaseURL("test-key", GPT6Luna, server.URL)
+	cg, err := NewCodeGenWithBaseURL("test-key", provider.GPT6Luna, server.URL)
 	if err != nil {
 		t.Fatalf("NewCodeGenWithBaseURL: %v", err)
 	}
@@ -51,7 +53,7 @@ func TestGenerateLayerFunctionOpenAINoChoices(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cg, err := NewCodeGenWithBaseURL("test-key", GPT6Luna, server.URL)
+	cg, err := NewCodeGenWithBaseURL("test-key", provider.GPT6Luna, server.URL)
 	if err != nil {
 		t.Fatalf("NewCodeGenWithBaseURL: %v", err)
 	}
@@ -70,7 +72,7 @@ func TestGenerateLayerFunctionAnthropic(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cg, err := NewCodeGenWithBaseURL("test-key", ClaudeSonnet5_5, server.URL)
+	cg, err := NewCodeGenWithBaseURL("test-key", provider.ClaudeSonnet5_5, server.URL)
 	if err != nil {
 		t.Fatalf("NewCodeGenWithBaseURL: %v", err)
 	}
